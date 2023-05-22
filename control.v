@@ -12,12 +12,13 @@ module control (
     MemtoReg_o,
     ALUOp_o,
     MemWrite_o,
+    MemRead_o,
     ALUSrc_o,
     RegWrite_o
 );
     input  [6:0] Opcode_i;
     output       Jalr_o, Jal_o, Branch_o;
-    output       MemtoReg_o, MemWrite_o;
+    output       MemtoReg_o, MemWrite_o, MemRead_o;
     output       ALUSrc_o, RegWrite_o;
     output [1:0] ALUOp_o;
     //ISA to be handled
@@ -56,6 +57,10 @@ module control (
     //If operation is SW, MemWrite = 1
     //                else, MemWrite = 0
     assign MemWrite_o = (Opcode_i == 7'b0100011) ? 1 : 0;
+
+    //If operation is LW, MemRead = 1
+    //                else, MemRead = 0
+    assign MemRead_o = (Opcode_i == 7'0000011) ? 1 : 0;
 
     //If operation is ADD or LW or JALR or SUB or AND or OR or SLT or JAL, RegWrite = 1
     //                SW or BEQ, RegWrite = 0

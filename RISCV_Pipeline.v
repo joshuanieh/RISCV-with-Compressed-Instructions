@@ -1,6 +1,16 @@
-/*Should be changed to
+/*
+Module: CHIP
+Author: Chia-Jen Nieh
+Description:
+    It's a single cycle CPU. Remeber to add an adder for Jalr when pipelining
+*/
+`include "alu_control.v"
+`include "alu.v"
+`include "control.v"
+`include "immgen.v"
+`include "register_file.v"
 
-	RISCV_Pipeline (
+module RISCV_Pipeline (
 		// control interface
 		clk, 
 		rst_n,
@@ -22,65 +32,59 @@
 		PC
 	);
 
-this interface after
-*/
-/*
-Module: CHIP
-Author: Chia-Jen Nieh
-Description:
-    It's a single cycle CPU. Remeber to add an adder for Jalr when pipelining
-*/
-`include "alu_control.v"
-`include "alu.v"
-`include "control.v"
-`include "immgen.v"
-`include "register_file.v"
-module RISCV_Pipeline(
-    clk,
-    rst_n,
-    // for mem_D
-    mem_wen_D,
-    mem_addr_D,
-    mem_wdata_D,
-    mem_rdata_D,
-    // for mem_I
-    mem_addr_I,
-    mem_rdata_I
-);
+//Input/Output
     input         clk, rst_n ;
-    // for mem_D
-    output        mem_wen_D  ;  // mem_wen_D is high, CHIP writes data to D-mem; else, CHIP reads data from D-mem
-    output [31:0] mem_addr_D ;  // the specific address to fetch/store data 
-    output [31:0] mem_wdata_D;  // data writing to D-mem 
-    input  [31:0] mem_rdata_D;  // data reading from D-mem
-    // for mem_I
-    output [31:0] mem_addr_I ;  // the fetching address of next instruction
-    input  [31:0] mem_rdata_I;  // instruction reading from I-mem
     
-    reg [31:0] PC_r;
-    wire [31:0] instruction;
-    wire [1:0] ALUOp;
-    wire [2:0] ALUCtrl;
-    wire [31:0] RS1_data, RS2_data, immgen_result, mux2;
-    wire zero;
-    wire [31:0] mux3, mux4;
-    wire [31:0] alu_result;
-    wire Jalr, Jal, Branch, MemtoReg, MemWrite, ALUSrc, RegWrite;
-    wire [31:0] mem_data, mux5;
-    wire [31:0] mux1;
+    output        ICACHE_ren;
+    output        ICACHE_wen;
+    output [29:0] ICACHE_addr;
+    output [31:0] ICACHE_wdata;
+    input         ICACHE_stall;
+    input  [31:0] ICACHE_rdata;
 
-    assign mem_wdata_D = {RS2_data[7:0], RS2_data[15:8], RS2_data[23:16], RS2_data[31:24]};
-    assign mem_addr_D = alu_result;
-    assign mem_wen_D = MemWrite;
-    assign mem_addr_I = PC_r;
-    assign mem_data = {mem_rdata_D[7:0], mem_rdata_D[15:8], mem_rdata_D[23:16], mem_rdata_D[31:24]};
-    assign instruction = {mem_rdata_I[7:0], mem_rdata_I[15:8], mem_rdata_I[23:16], mem_rdata_I[31:24]};
+    output        DCACHE_ren;
+    output        DCACHE_wen;
+    output [29:0] DCACHE_addr;
+    output [31:0] DCACHE_wdata;
+    input         DCACHE_stall;
+    input  [31:0] DCACHE_rdata;
+
+    output [31:0] PC;
+    
+//Wire/reg    
+    reg    [31:0] PC_r;
+    wire   [31:0] instruction;
+    wire   [1:0]  ALUOp;
+    wire   [2:0]  ALUCtrl;
+    wire   [31:0] RS1_data, RS2_data, immgen_result, mux2;
+    wire          zero;
+    wire   [31:0] mux3, mux4;
+    wire   [31:0] alu_result;
+    wire          Jalr, Jal, Branch, MemtoReg, MemWrite, MemRead, ALUSrc, RegWrite;
+    wire   [31:0] mem_data, mux5;
+    wire   [31:0] mux1;
+
+//output logic
+    assign ICACHE_ren = 1'b1;
+    assign ICACHE_wen = 1'b0;
+    assign ICACHE_addr = PC_r[31:2];
+    assign ICACHE_wdata = 32'd0;
+    assign DCACHE_ren = MemRead;
+    assign DCACHE_wen = MemWrite;
+    assign DCACHE_addr = alu_result;
+    assign DCACHE_wdata = {RS2_data[7:0], RS2_data[15:8], RS2_data[23:16], RS2_data[31:24]};
+    assign PC = PC_r;
+
+//internal wire
+    assign mem_data = {DCACHE_rdata[7:0], DCACHE_rdata[15:8], DCACHE_rdata[23:16], DCACHE_rdata[31:24]};
+    assign instruction = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]};
     assign mux1 = ((Jal | Jalr) == 1'b0) ? mux5 : PC_r + 4;
     assign mux2 = (ALUSrc == 1'b0) ? RS2_data : immgen_result;
     assign mux3 = (((zero & Branch) | Jal) == 1'b0) ? PC_r + 4 : PC_r + immgen_result;
     assign mux4 = (Jalr == 1'b0) ? mux3 : alu_result;
     assign mux5 = (MemtoReg == 1'b0) ? alu_result : mem_data;
 
+//module intantiation
     always @(posedge clk) begin
         if(rst_n == 1'b0) begin
             PC_r <= 32'd0;
@@ -113,6 +117,7 @@ module RISCV_Pipeline(
         .MemtoReg_o(MemtoReg),
         .ALUOp_o(ALUOp),
         .MemWrite_o(MemWrite),
+        .MemRead_o(MemRead),
         .ALUSrc_o(ALUSrc),
         .RegWrite_o(RegWrite)
     );
