@@ -55,11 +55,11 @@ module control (
 
     //If operation is JALR, JALR = 1
     //                else, JALR = 0
-    assign Jalr_o = (Opcode_i == 7'b1100111) ? 1'b1 : 1'b0;
+    assign Jalr_o = ((Opcode_i[2] == 1'b1) && (Opcode_i[3] == 1'b0)) ? 1'b1 : 1'b0;
 
     //If operation is JAL, JAL = 1
     //                else, JAL = 0
-    assign Jal_o = (Opcode_i == 7'b1101111) ? 1'b1 : 1'b0;
+    assign Jal_o = ((Opcode_i[2] == 1'b1) && (Opcode_i[3] == 1'b1)) ? 1'b1 : 1'b0;
 
     //If operation is BEQ or BNE, Branch = 1
     //                else, Branch = 0
