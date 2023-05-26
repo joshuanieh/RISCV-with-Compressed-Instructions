@@ -1,4 +1,8 @@
 // Top module of your design, you cannot modify this module!!
+
+`include "RISCV_Pipeline.v"
+`include "cache.v"
+
 module CHIP (	clk,
 				rst_n,
 //----------for slow_memD------------
