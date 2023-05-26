@@ -55,35 +55,35 @@ module control (
 
     //If operation is JALR, JALR = 1
     //                else, JALR = 0
-    assign Jalr_o = (Opcode_i == 7'b1100111) ? 1 : 0;
+    assign Jalr_o = (Opcode_i == 7'b1100111) ? 1'b1 : 1'b0;
 
     //If operation is JAL, JAL = 1
     //                else, JAL = 0
-    assign Jal_o = (Opcode_i == 7'b1101111) ? 1 : 0;
+    assign Jal_o = (Opcode_i == 7'b1101111) ? 1'b1 : 1'b0;
 
     //If operation is BEQ or BNE, Branch = 1
     //                else, Branch = 0
-    assign Branch_o = (Opcode_i == 7'b1100011) ? 1 : 0;
+    assign Branch_o = (Opcode_i == 7'b1100011) ? 1'b1 : 1'b0;
 
     //If operation is LW, MemtoReg = 1
     //                else, MemtoReg = 0
-    assign MemtoReg_o = (Opcode_i == 7'b0000011) ? 1 : 0;
+    assign MemtoReg_o = (Opcode_i == 7'b0000011) ? 1'b1 : 1'b0;
 
     //If operation is SW, MemWrite = 1
     //                else, MemWrite = 0
-    assign MemWrite_o = (Opcode_i == 7'b0100011) ? 1 : 0;
+    assign MemWrite_o = (Opcode_i == 7'b0100011) ? 1'b1 : 1'b0;
 
     //If operation is LW, MemRead = 1
     //                else, MemRead = 0
-    assign MemRead_o = (Opcode_i == 7'b0000011) ? 1 : 0;
+    assign MemRead_o = (Opcode_i == 7'b0000011) ? 1'b1 : 1'b0;
 
     //If operation is ADD or ADDI or LW or JALR or SUB or AND or ANDI or OR or ORI or SLT or SLTI or JAL or XOR or XORI or SLLI or SRLI or SRAI, RegWrite = 1
     //                SW or BEQ or BNE, RegWrite = 0
-    assign RegWrite_o = ((Opcode_i == 7'b0100011) | (Opcode_i == 7'b1100011)) ? 0 : 1;
+    assign RegWrite_o = ((Opcode_i == 7'b0100011) | (Opcode_i == 7'b1100011)) ? 1'b0 : 1'b1;
 
     //If operation is ADD or SUB or BEQ or BNE or AND or OR or XOR or SLT, ALUSrc = 0
     //                LW or SW or JALR or ADDI or ANDI or ORI or XORI or SLLI or SRLI or SRAI or SLTI, ALUSrc = 1
-    assign ALUSrc_o = ((Opcode_i == 7'b0110011) | (Opcode_i == 7'b1100011)) ? 0 : 1;
+    assign ALUSrc_o = ((Opcode_i == 7'b0110011) | (Opcode_i == 7'b1100011)) ? 1'b0 : 1'b1;
 
     //ALUOp are two bits. //2'd0 represents 0110011 (R), 2'd1 represents 0010011 (I), 2'd2 represents 1100011 (B), 2'd3 represents others
     assign ALUOp_o = ((Opcode_i[5] == 1'b1) && (Opcode_i[4] == 1'b1)) ? 2'd0 :
