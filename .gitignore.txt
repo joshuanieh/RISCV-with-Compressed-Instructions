@@ -3,3 +3,4 @@ I_mem_hasHazard
 I_mem_noHazard
 *.vcd
 *.out
+Final_tb.v
