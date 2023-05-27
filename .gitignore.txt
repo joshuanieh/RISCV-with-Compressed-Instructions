@@ -1,3 +1,5 @@
 D_mem
 I_mem_hasHazard
 I_mem_noHazard
+*.vcd
+*.out

@@ -181,7 +181,7 @@ module RISCV_Pipeline (
         .clk(clk),
         .rst_n(rst_n),
         .Stall(stall),
-        .Flush(Flush_IFID),
+        .Flush(Flush_IFID & (~stall_mem)),
         .instr_i(instruction_w),
         .PC_i(PC_r),
         .instr_o(instruction_r),
@@ -192,7 +192,7 @@ module RISCV_Pipeline (
         .clk(clk),                  // clk, PC (used for WriteBack of JAL and JALR)
         .rst_n(rst_n),
         .Stall(stall_mem),
-        .Flush(Flush_IDEX),
+        .Flush(Flush_IDEX & (~stall_mem)),
         .PC_i(PC_r_IFID),
         .Jalr_i(Jalr),
         .Jal_i(Jal),

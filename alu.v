@@ -79,7 +79,7 @@ module alu (
         xor_result = data1_i ^ data2_i;
         sll_result = data1_i << data2_i[4:0];
         srl_result = data1_i >> data2_i[4:0];
-        sra_result = data1_i >>> data2_i[4:0];
+        sra_result = $signed(data1_i) >>> data2_i[4:0];
     end
 
     always @(*) begin

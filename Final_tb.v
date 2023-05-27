@@ -13,10 +13,10 @@
     `define IMEM_INIT "I_mem_noHazard"
     `include "./TestBed_noHazard.v"
 `endif
-`ifdef hasHazard
+// `ifdef hasHazard
 	`define IMEM_INIT "I_mem_hasHazard"
 	`include "./TestBed_hasHazard.v"
-`endif	
+// `endif	
 `ifdef BrPred
 	`define IMEM_INIT "I_mem_BrPred"
 	`include "./TestBed_BrPred.v"
@@ -56,6 +56,7 @@ module Final_tb;
 	wire [7:0] error_num;
 	wire [15:0] duration;
 	wire finish;	
+	wire [31:0] PC;
 
 	// Note the design is connected at testbench, include:
 	// 1. CHIP (RISCV + D_cache + I_chache)
@@ -81,7 +82,8 @@ module Final_tb;
 //----------for TestBed--------------				
 				DCACHE_addr,
 				DCACHE_wdata,
-				DCACHE_wen
+				DCACHE_wen,
+				PC
 				);
 	
 	slow_memory slow_memD(
@@ -128,11 +130,11 @@ module Final_tb;
 		$readmemh (`IMEM_INIT, slow_memI.mem ); // initialize data in IMEM
 
 		// waveform dump
-	    // $dumpfile("Final.vcd");
-	    // $dumpvars;
-	    $fsdbDumpfile("Final.fsdb");			
-		$fsdbDumpvars(0,Final_tb,"+mda");
-		$fsdbDumpvars;
+	    $dumpfile("Final.vcd");
+	    $dumpvars;
+	    // $fsdbDumpfile("Final.fsdb");			
+		// $fsdbDumpvars(0,Final_tb,"+mda");
+		// $fsdbDumpvars;
 	
 		clk = 0;
 		rst_n = 1'b1;
