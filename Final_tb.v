@@ -13,10 +13,10 @@
     `define IMEM_INIT "I_mem_noHazard"
     `include "./TestBed_noHazard.v"
 `endif
-// `ifdef hasHazard
+`ifdef hasHazard
 	`define IMEM_INIT "I_mem_hasHazard"
 	`include "./TestBed_hasHazard.v"
-// `endif	
+`endif	
 `ifdef BrPred
 	`define IMEM_INIT "I_mem_BrPred"
 	`include "./TestBed_BrPred.v"
