@@ -34,6 +34,12 @@ integer i;
 always@(*) begin
     RS1_data_o = reg_r[RS1_address_i];
     RS2_data_o = reg_r[RS2_address_i];
+    if (RS1_address_i == RD_address_i && RegWrite_i == 1'b1 && RD_address_i != 5'd0) begin
+        RS1_data_o = RD_data_i;
+    end
+    if (RS2_address_i == RD_address_i && RegWrite_i == 1'b1 && RD_address_i != 5'd0) begin
+        RS2_data_o = RD_data_i;
+    end
 end
 
 always@(posedge clk_i) begin
