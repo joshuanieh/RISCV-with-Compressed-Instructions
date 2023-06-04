@@ -12,7 +12,6 @@ Description:
 `include "Pipeline_Registers.v"
 `include "Forwarding_Unit.v"
 `include "Hazard_Detection_Unit.v"
-`include "decompressor.v"
 
 module RISCV_Pipeline (
 		// control interface
@@ -62,23 +61,13 @@ module RISCV_Pipeline (
     wire   [31:0] RS2_data_IDEX, RS2_data_EXMEM, immgen_result_IDEX, alu_result_EXMEM, alu_result_MEMWB, mem_data_MEMWB;
     wire   [1:0]  ALUOp, ALUOp_IDEX, ForwardA, ForwardB;
     wire   [3:0]  ALUCtrl, ALUCtrl_in;
-    wire   [31:0] RS1_data, RS2_data, immgen_result, mem_data, decompressed_instruction, mux9, instruction_IFID;
+    wire   [31:0] RS1_data, RS2_data, immgen_result, mem_data, instruction_r;
     wire   [31:0] mux1, mux2, mux3, mux4, mux5, mux6, mux7, mux8, alu_result;
     wire          zero, stall_mem, branch_or_jal, branch_or_jump, stall, stall_load_use, Flush_IFID, Flush_IDEX;
     wire          Jalr, Jal, Branch, MemtoReg, MemWrite, MemRead, ALUSrc, RegWrite;
     wire          Jalr_IDEX, Jal_IDEX, Branch_IDEX, ALUSrc_IDEX, MemRead_IDEX, MemWrite_IDEX, MemtoReg_IDEX, RegWrite_IDEX;
     wire          Jalr_EXMEM, Jal_EXMEM, MemRead_EXMEM, MemWrite_EXMEM, MemtoReg_EXMEM, RegWrite_EXMEM;
     wire          Jalr_MEMWB, Jal_MEMWB, MemtoReg_MEMWB, RegWrite_MEMWB;
-    reg    [15:0] compression_buffer_r, compression_buffer_w; //For compression extention
-    reg    [1:0]  state_r, state_w; //For compression extention
-    reg    [31:0] true_instruction;
-    wire          is_compress;
-    wire          compress_IDEX;
-
-//state
-    parameter COMPLETE = 2'd0;   //Perfect border
-    parameter INCOMPLETE = 2'd1; //Middle
-    parameter PREPARE = 2'd2;    //For J type and B type, fall at middle
 
 //output logic
     assign ICACHE_ren = 1'b1;
@@ -91,110 +80,24 @@ module RISCV_Pipeline (
     assign DCACHE_wdata = {RS2_data_EXMEM[7:0], RS2_data_EXMEM[15:8], RS2_data_EXMEM[23:16], RS2_data_EXMEM[31:24]};
     assign PC = PC_r;
 
-///////////////////////////////////////+4 should be changed//////////////////////////////////
 //internal wire
     assign mem_data = {DCACHE_rdata[7:0], DCACHE_rdata[15:8], DCACHE_rdata[23:16], DCACHE_rdata[31:24]};
     assign instruction_w = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]};
     assign mux1 = ((Jal_MEMWB | Jalr_MEMWB) == 1'b0) ? mux5 : PC_r_MEMWB_plus4;
     assign mux2 = (ALUSrc_IDEX == 1'b0) ? mux7 : immgen_result_IDEX;
-    assign mux3 = (!branch_or_jal) ? mux9 : PC_r_IDEX + immgen_result_IDEX;
+    assign mux3 = (!branch_or_jal) ? PC_r + 4 : PC_r_IDEX + immgen_result_IDEX;
     assign mux4 = (Jalr_IDEX == 1'b0) ? mux3 : alu_result;
     assign mux5 = (MemtoReg_MEMWB == 1'b0) ? alu_result_MEMWB : mem_data_MEMWB;
     assign stall_mem = ICACHE_stall | DCACHE_stall; // stall due to memory access
     assign stall = stall_mem | stall_load_use;      // stall due to memory access and load use data hazard 
-    assign PC_r_IDEX_plus4 = (compress_IDEX == 1'b1) ? PC_r_IDEX + 2 : PC_r_IDEX + 4;
+    assign PC_r_IDEX_plus4 = PC_r_IDEX + 4;
     assign mux6 = (ForwardA[1])? mux8 : (ForwardA[0])? mux1 : RS1_data_IDEX; // Forwarding
     assign mux7 = (ForwardB[1])? mux8 : (ForwardB[0])? mux1 : RS2_data_IDEX; 
     assign mux8 = (Jal_IDEX | Jalr_IDEX) ? PC_r_EXMEM_plus4 : alu_result_EXMEM;
     assign branch_or_jal = (zero & Branch_IDEX) | Jal_IDEX;
     assign branch_or_jump = branch_or_jal | Jalr_IDEX;
-    assign is_compress = (instruction_IFID[1:0] != 2'b11);
-    assign mux9 = (true_instruction[1:0] == 2'b11) ? PC_r + 4 : PC_r + 2;
 
-
-    always @(*) begin
-        case (state_r)
-            COMPLETE: begin
-                if (branch_or_jump) begin
-                    if (mux4[1] == 1'b1) begin
-                        state_w <= PREPARE;
-                    end
-                    else begin
-                        state_w <= COMPLETE;
-                    end
-                    compression_buffer_w <= 16'd0;
-                end
-                else if (instruction_w[1:0] == 2'b11) begin
-                    state_w <= COMPLETE;
-                    compression_buffer_w <= 16'd0;
-                end
-                else begin
-                    state_w <= INCOMPLETE;
-                    compression_buffer_w <= instruction_w[31:16];
-                end
-            end
-            INCOMPLETE: begin
-                if (branch_or_jump) begin
-                    if (mux4[1] == 1'b1) begin
-                        state_w <= PREPARE;
-                    end
-                    else begin
-                        state_w <= COMPLETE;
-                    end
-                    compression_buffer_w <= 16'd0;
-                end
-                else if (compression_buffer_r[1:0] == 2'b11) begin
-                    state_w <= INCOMPLETE;
-                    compression_buffer_w <= instruction_w[31:16];
-                end
-                else begin
-                    state_w <= COMPLETE;
-                    compression_buffer_w <= 16'd0;
-                end
-            end
-            PREPARE: begin
-                state_w <= INCOMPLETE;
-                compression_buffer_w <= instruction_w[31:16];
-            end
-            default: begin
-                state_w <= COMPLETE;
-                compression_buffer_w <= 16'd0;
-            end
-        endcase
-    end
-
-    always @(posedge clk) begin
-        if(rst_n == 1'b0) begin
-            state_r <= COMPLETE;
-            compression_buffer_r <= 16'd0;
-        end
-        else if (stall) begin
-            state_r <= state_r;
-            compression_buffer_r <= compression_buffer_r;
-        end
-        else begin
-            state_r <= state_w;
-            compression_buffer_r <= compression_buffer_w;
-        end
-    end
-
-    always @(*) begin
-        case (state_r)
-            COMPLETE: begin
-                true_instruction <= instruction_w;
-            end
-            INCOMPLETE: begin
-                true_instruction <= {instruction_w[15:0], compression_buffer_r};
-            end
-            PREPARE: begin
-               true_instruction <= 32'b000000000000_00000_000_00000_0010011; //addi r0, r0, 0
-            end
-            default: begin
-               true_instruction <= 32'b000000000000_00000_000_00000_0010011; //addi r0, r0, 0
-            end
-        endcase
-    end
-
+//module intantiation
     always @(posedge clk) begin
         if(rst_n == 1'b0) begin
             PC_r <= 32'd0;
@@ -206,13 +109,6 @@ module RISCV_Pipeline (
             PC_r <= mux4;
         end
     end
-
-//module intantiation
-    decompressor decompressor (
-        .instr_i(instruction_IFID),
-        .decompress_i(is_compress),
-        .instr_o(decompressed_instruction)
-    );
 
     alu_control alu_control (
         .Funct7_i(ALUCtrl_in[3]),
@@ -230,7 +126,7 @@ module RISCV_Pipeline (
     );
 
     control control (
-        .Opcode_i(decompressed_instruction[6:0]),
+        .Opcode_i(instruction_r[6:0]),
         .Jalr_o(Jalr),
         .Jal_o(Jal),
         .Branch_o(Branch),
@@ -243,7 +139,7 @@ module RISCV_Pipeline (
     );
 
     immgen immgen (
-        .instruction_i(decompressed_instruction),
+        .instruction_i(instruction_r),
         .immgen_o(immgen_result)
     );
 
@@ -253,8 +149,8 @@ module RISCV_Pipeline (
         .RegWrite_i(RegWrite_MEMWB),
         .RD_address_i(RDaddr_MEMWB),
         .RD_data_i(mux1),
-        .RS1_address_i(decompressed_instruction[19:15]),
-        .RS2_address_i(decompressed_instruction[24:20]),
+        .RS1_address_i(instruction_r[19:15]),
+        .RS2_address_i(instruction_r[24:20]),
         .RS1_data_o(RS1_data),
         .RS2_data_o(RS2_data)
     );
@@ -273,8 +169,8 @@ module RISCV_Pipeline (
     Hazard_Detection_Unit Hazard_Detection_Unit (
         .MemRead_i(MemRead_IDEX),
         .RDaddr_i(RDaddr_IDEX),
-        .RS1addr_i(decompressed_instruction[19:15]),
-        .RS2addr_i(decompressed_instruction[24:20]),
+        .RS1addr_i(instruction_r[19:15]),
+        .RS2addr_i(instruction_r[24:20]),
         .BranchOrJump_i(branch_or_jump),
         .Stall_load_use_o(stall_load_use),
         .Flush_IFID_o(Flush_IFID),
@@ -286,16 +182,15 @@ module RISCV_Pipeline (
         .rst_n(rst_n),
         .Stall(stall),
         .Flush(Flush_IFID & (~stall_mem)),
-        .instr_i(true_instruction),
+        .instr_i(instruction_w),
         .PC_i(PC_r),
-        .instr_o(instruction_IFID),
+        .instr_o(instruction_r),
         .PC_o(PC_r_IFID)
     );
 
     IDEX IDEX (
         .clk(clk),                  // clk, PC (used for WriteBack of JAL and JALR)
         .rst_n(rst_n),
-        .compress_i(is_compress),
         .Stall(stall_mem),
         .Flush(Flush_IDEX & (~stall_mem)),
         .PC_i(PC_r_IFID),
@@ -310,10 +205,10 @@ module RISCV_Pipeline (
         .MemtoReg_i(MemtoReg),
         .RS1data_i(RS1_data),            // data and addr for RS1, RS2 and RD
         .RS2data_i(RS2_data),
-        .RS1addr_i(decompressed_instruction[19:15]),
-        .RS2addr_i(decompressed_instruction[24:20]),
-        .RDaddr_i(decompressed_instruction[11:7]),
-        .funct_i({decompressed_instruction[30], decompressed_instruction[14:12]}),              // input of ALU control : instr[30, 14:12]
+        .RS1addr_i(instruction_r[19:15]),
+        .RS2addr_i(instruction_r[24:20]),
+        .RDaddr_i(instruction_r[11:7]),
+        .funct_i({instruction_r[30], instruction_r[14:12]}),              // input of ALU control : instr[30, 14:12]
         .imm_i(immgen_result),
 
         .PC_o(PC_r_IDEX),
@@ -332,8 +227,7 @@ module RISCV_Pipeline (
         .RS2addr_o(RS2addr_IDEX),
         .RDaddr_o(RDaddr_IDEX),
         .funct_o(ALUCtrl_in),
-        .imm_o(immgen_result_IDEX),
-        .compress_o(compress_IDEX)
+        .imm_o(immgen_result_IDEX)
     );
 
     EXMEM EXMEM (

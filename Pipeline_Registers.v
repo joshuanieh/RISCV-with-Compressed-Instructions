@@ -32,6 +32,7 @@ endmodule
 module IDEX( 
     clk,                  // clk, PC (used for WriteBack of JAL and JALR)
     rst_n,
+    compress_i, //meaning the it's compressed instruction at PC_i
     Stall,
     Flush,
     PC_i,
@@ -67,21 +68,23 @@ module IDEX(
     RS2addr_o,
     RDaddr_o,
     funct_o,
-    imm_o
+    imm_o,
+    compress_o
 );
-    input             clk, rst_n, Stall, Flush, Jalr_i, Jal_i, Branch_i, ALUSrc_i, RegWrite_i, MemtoReg_i, MemRead_i, MemWrite_i;
+    input             clk, rst_n, compress_i, Stall, Flush, Jalr_i, Jal_i, Branch_i, ALUSrc_i, RegWrite_i, MemtoReg_i, MemRead_i, MemWrite_i;
     input      [1:0]  ALUOp_i;
     input      [31:0] RS1data_i, RS2data_i, PC_i, imm_i;
     input      [3:0]  funct_i;
     input      [4:0]  RS1addr_i, RS2addr_i, RDaddr_i;
     output reg [1:0]  ALUOp_o;
-    output reg        Jalr_o, Jal_o, Branch_o, ALUSrc_o, RegWrite_o, MemtoReg_o, MemRead_o, MemWrite_o;
+    output reg        Jalr_o, Jal_o, Branch_o, ALUSrc_o, RegWrite_o, MemtoReg_o, MemRead_o, MemWrite_o, compress_o;
     output reg [31:0] RS1data_o, RS2data_o, PC_o, imm_o;
     output reg [3:0]  funct_o;
     output reg [4:0]  RS1addr_o, RS2addr_o, RDaddr_o;
 
     always @(posedge clk) begin
         if (!rst_n | Flush) begin
+            compress_o <= 0;
             Jalr_o     <= 0;
             Jal_o      <= 0;
             Branch_o   <= 0;
@@ -95,6 +98,7 @@ module IDEX(
             RDaddr_o    <= 0;
         end 
         else if (Stall) begin
+            compress_o <= compress_o;
             Jalr_o     <= Jalr_o;
             Jal_o      <= Jal_o;
             Branch_o   <= Branch_o;
@@ -114,6 +118,7 @@ module IDEX(
             imm_o      <= imm_o;
         end
         else begin
+            compress_o <= compress_i;
             Jalr_o     <= Jalr_i;
             Jal_o      <= Jal_i;
             Branch_o   <= Branch_i;
