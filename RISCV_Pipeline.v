@@ -10,6 +10,8 @@ Description:
 `include "immgen.v"
 `include "register_file.v"
 `include "Pipeline_Registers.v"
+`include "Forwarding_Unit.v"
+`include "Hazard_Detection_Unit.v"
 
 module RISCV_Pipeline (
 		// control interface
@@ -55,13 +57,13 @@ module RISCV_Pipeline (
 //Wire/reg    
     reg    [31:0] PC_r;
     wire   [4:0]  RS1addr_IDEX, RS2addr_IDEX, RDaddr_IDEX, RDaddr_EXMEM, RDaddr_MEMWB;
-    wire   [31:0] instruction_w, PC_r_IFID, PC_r_IDEX, PC_r_EXMEM, PC_r_MEMWB, RS1_data_IDEX;
+    wire   [31:0] instruction_w, PC_r_IFID, PC_r_IDEX, PC_r_IDEX_plus4, PC_r_EXMEM_plus4, PC_r_MEMWB_plus4, RS1_data_IDEX;
     wire   [31:0] RS2_data_IDEX, RS2_data_EXMEM, immgen_result_IDEX, alu_result_EXMEM, alu_result_MEMWB, mem_data_MEMWB;
-    wire   [1:0]  ALUOp, ALUOp_IDEX;
+    wire   [1:0]  ALUOp, ALUOp_IDEX, ForwardA, ForwardB;
     wire   [3:0]  ALUCtrl, ALUCtrl_in;
     wire   [31:0] RS1_data, RS2_data, immgen_result, mem_data, instruction_r;
-    wire   [31:0] mux1, mux2, mux3, mux4, mux5, alu_result;
-    wire          zero, stall;
+    wire   [31:0] mux1, mux2, mux3, mux4, mux5, mux6, mux7, mux8, alu_result;
+    wire          zero, stall_mem, branch_or_jal, branch_or_jump, stall, stall_load_use, Flush_IFID, Flush_IDEX;
     wire          Jalr, Jal, Branch, MemtoReg, MemWrite, MemRead, ALUSrc, RegWrite;
     wire          Jalr_IDEX, Jal_IDEX, Branch_IDEX, ALUSrc_IDEX, MemRead_IDEX, MemWrite_IDEX, MemtoReg_IDEX, RegWrite_IDEX;
     wire          Jalr_EXMEM, Jal_EXMEM, MemRead_EXMEM, MemWrite_EXMEM, MemtoReg_EXMEM, RegWrite_EXMEM;
@@ -81,12 +83,19 @@ module RISCV_Pipeline (
 //internal wire
     assign mem_data = {DCACHE_rdata[7:0], DCACHE_rdata[15:8], DCACHE_rdata[23:16], DCACHE_rdata[31:24]};
     assign instruction_w = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]};
-    assign mux1 = ((Jal_MEMWB | Jalr_MEMWB) == 1'b0) ? mux5 : PC_r_MEMWB + 4;
-    assign mux2 = (ALUSrc_IDEX == 1'b0) ? RS2_data_IDEX : immgen_result_IDEX;
-    assign mux3 = (((zero & Branch_IDEX) | Jal_IDEX) == 1'b0) ? PC_r + 4 : PC_r_IDEX + immgen_result_IDEX;
+    assign mux1 = ((Jal_MEMWB | Jalr_MEMWB) == 1'b0) ? mux5 : PC_r_MEMWB_plus4;
+    assign mux2 = (ALUSrc_IDEX == 1'b0) ? mux7 : immgen_result_IDEX;
+    assign mux3 = (!branch_or_jal) ? PC_r + 4 : PC_r_IDEX + immgen_result_IDEX;
     assign mux4 = (Jalr_IDEX == 1'b0) ? mux3 : alu_result;
     assign mux5 = (MemtoReg_MEMWB == 1'b0) ? alu_result_MEMWB : mem_data_MEMWB;
-    assign stall = ICACHE_stall | DCACHE_stall;
+    assign stall_mem = ICACHE_stall | DCACHE_stall; // stall due to memory access
+    assign stall = stall_mem | stall_load_use;      // stall due to memory access and load use data hazard 
+    assign PC_r_IDEX_plus4 = PC_r_IDEX + 4;
+    assign mux6 = (ForwardA[1])? mux8 : (ForwardA[0])? mux1 : RS1_data_IDEX; // Forwarding
+    assign mux7 = (ForwardB[1])? mux8 : (ForwardB[0])? mux1 : RS2_data_IDEX; 
+    assign mux8 = (Jal_IDEX | Jalr_IDEX) ? PC_r_EXMEM_plus4 : alu_result_EXMEM;
+    assign branch_or_jal = (zero & Branch_IDEX) | Jal_IDEX;
+    assign branch_or_jump = branch_or_jal | Jalr_IDEX;
 
 //module intantiation
     always @(posedge clk) begin
@@ -110,7 +119,7 @@ module RISCV_Pipeline (
 
     alu alu (
         .ALUCtrl_i(ALUCtrl),
-        .data1_i(RS1_data_IDEX),
+        .data1_i(mux6),
         .data2_i(mux2),
         .zero_o(zero),
         .data_o(alu_result)
@@ -146,11 +155,33 @@ module RISCV_Pipeline (
         .RS2_data_o(RS2_data)
     );
 
+    Forwarding_Unit Forwarding_Unit (
+        .RS1addr_i(RS1addr_IDEX),
+        .RS2addr_i(RS2addr_IDEX),
+        .RDaddr_EXMEM_i(RDaddr_EXMEM),
+        .RegWrite_EXMEM_i(RegWrite_EXMEM),
+        .RDaddr_MEMWB_i(RDaddr_MEMWB),
+        .RegWrite_MEMWB_i(RegWrite_MEMWB),
+        .ForwardA_o(ForwardA),
+        .ForwardB_o(ForwardB)
+    );
+
+    Hazard_Detection_Unit Hazard_Detection_Unit (
+        .MemRead_i(MemRead_IDEX),
+        .RDaddr_i(RDaddr_IDEX),
+        .RS1addr_i(instruction_r[19:15]),
+        .RS2addr_i(instruction_r[24:20]),
+        .BranchOrJump_i(branch_or_jump),
+        .Stall_load_use_o(stall_load_use),
+        .Flush_IFID_o(Flush_IFID),
+        .Flush_IDEX_o(Flush_IDEX)
+    );
+
     IFID IFID (
         .clk(clk),
         .rst_n(rst_n),
         .Stall(stall),
-        .Flush(1'b0),
+        .Flush(Flush_IFID & (~stall_mem)),
         .instr_i(instruction_w),
         .PC_i(PC_r),
         .instr_o(instruction_r),
@@ -160,8 +191,8 @@ module RISCV_Pipeline (
     IDEX IDEX (
         .clk(clk),                  // clk, PC (used for WriteBack of JAL and JALR)
         .rst_n(rst_n),
-        .Stall(stall),
-        .Flush(1'b0),
+        .Stall(stall_mem),
+        .Flush(Flush_IDEX & (~stall_mem)),
         .PC_i(PC_r_IFID),
         .Jalr_i(Jalr),
         .Jal_i(Jal),
@@ -202,8 +233,8 @@ module RISCV_Pipeline (
     EXMEM EXMEM (
         .clk(clk),
         .rst_n(rst_n),
-        .Stall(stall),
-        .PC_i(PC_r_IDEX),
+        .Stall(stall_mem),
+        .PC_i(PC_r_IDEX_plus4),
         .Jalr_i(Jalr_IDEX),
         .Jal_i(Jal_IDEX),
         .RegWrite_i(RegWrite_IDEX),
@@ -214,7 +245,7 @@ module RISCV_Pipeline (
         .RS2data_i(RS2_data_IDEX),
         .RDaddr_i(RDaddr_IDEX),
 
-        .PC_o(PC_r_EXMEM),
+        .PC_o(PC_r_EXMEM_plus4),
         .Jalr_o(Jalr_EXMEM),
         .Jal_o(Jal_EXMEM),
         .RegWrite_o(RegWrite_EXMEM),
@@ -229,8 +260,8 @@ module RISCV_Pipeline (
     MEMWB MEMWB (
         .clk(clk),
         .rst_n(rst_n),
-        .Stall(stall),
-        .PC_i(PC_r_EXMEM),
+        .Stall(stall_mem),
+        .PC_i(PC_r_EXMEM_plus4),
         .Jalr_i(Jalr_EXMEM),
         .Jal_i(Jal_EXMEM),
         .RegWrite_i(RegWrite_EXMEM),
@@ -239,7 +270,7 @@ module RISCV_Pipeline (
         .MemData_i(mem_data),
         .RDaddr_i(RDaddr_EXMEM),
 
-        .PC_o(PC_r_MEMWB),
+        .PC_o(PC_r_MEMWB_plus4),
         .Jalr_o(Jalr_MEMWB),
         .Jal_o(Jal_MEMWB),
         .RegWrite_o(RegWrite_MEMWB),
