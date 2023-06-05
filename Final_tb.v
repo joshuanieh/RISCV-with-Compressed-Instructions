@@ -25,10 +25,10 @@
 	`define IMEM_INIT "I_mem_compression"
 	`include "./TestBed_compression.v"
 `endif
-`ifdef decompression
+// `ifdef decompression
 	`define IMEM_INIT "I_mem_decompression"
 	`include "./TestBed_compression.v"
-`endif			
+// `endif			
 
 module Final_tb;
 
@@ -142,7 +142,7 @@ module Final_tb;
 		#(`CYCLE*8.9) 
 		#0.1 rst_n = 1'b1;
      
-		#(`CYCLE*10000) // calculate clock cycles for all operation (you can modify it)
+		#(`CYCLE*200) // calculate clock cycles for all operation (you can modify it)
 		$display("============================================================================");
 		$display("\n           Error!!! There is something wrong with your code ...!          ");
 		$display("\n                       The test result is .....FAIL                     \n");

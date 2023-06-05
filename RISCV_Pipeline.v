@@ -58,7 +58,7 @@ module RISCV_Pipeline (
 //Wire/reg    
     reg    [31:0] PC_r;
     wire   [4:0]  RS1addr_IDEX, RS2addr_IDEX, RDaddr_IDEX, RDaddr_EXMEM, RDaddr_MEMWB;
-    wire   [31:0] instruction_w, PC_r_IFID, PC_r_IDEX, PC_r_IDEX_plus4, PC_r_EXMEM_plus4, PC_r_MEMWB_plus4, RS1_data_IDEX;
+    wire   [31:0] instruction_w, PC_r_IFID, PC_r_IDEX, PC_r_IDEX_plus4, PC_r_EXMEM_plus4, PC_r_MEMWB_plus4, RS1_data_IDEX, PC_r_plus2;
     wire   [31:0] RS2_data_IDEX, RS2_data_EXMEM, immgen_result_IDEX, alu_result_EXMEM, alu_result_MEMWB, mem_data_MEMWB;
     wire   [1:0]  ALUOp, ALUOp_IDEX, ForwardA, ForwardB;
     wire   [3:0]  ALUCtrl, ALUCtrl_in;
@@ -83,14 +83,14 @@ module RISCV_Pipeline (
 //output logic
     assign ICACHE_ren = 1'b1;
     assign ICACHE_wen = 1'b0;
-    assign ICACHE_addr = PC_r[31:2];
+    assign ICACHE_addr = (state_r == PREPARE) ? PC_r[31:2] : PC_r_plus2[31:2];
     assign ICACHE_wdata = 32'd0;
     assign DCACHE_ren = MemRead_EXMEM;
     assign DCACHE_wen = MemWrite_EXMEM;
     assign DCACHE_addr = alu_result_EXMEM[31:2];
     assign DCACHE_wdata = {RS2_data_EXMEM[7:0], RS2_data_EXMEM[15:8], RS2_data_EXMEM[23:16], RS2_data_EXMEM[31:24]};
     assign PC = PC_r;
-
+always@* $monitorh(PC);
 ///////////////////////////////////////+4 should be changed//////////////////////////////////
 //internal wire
     assign mem_data = {DCACHE_rdata[7:0], DCACHE_rdata[15:8], DCACHE_rdata[23:16], DCACHE_rdata[31:24]};
@@ -105,60 +105,60 @@ module RISCV_Pipeline (
     assign PC_r_IDEX_plus4 = (compress_IDEX == 1'b1) ? PC_r_IDEX + 2 : PC_r_IDEX + 4;
     assign mux6 = (ForwardA[1])? mux8 : (ForwardA[0])? mux1 : RS1_data_IDEX; // Forwarding
     assign mux7 = (ForwardB[1])? mux8 : (ForwardB[0])? mux1 : RS2_data_IDEX; 
-    assign mux8 = (Jal_IDEX | Jalr_IDEX) ? PC_r_EXMEM_plus4 : alu_result_EXMEM;
+    assign mux8 = (Jal_EXMEM | Jalr_EXMEM) ? PC_r_EXMEM_plus4 : alu_result_EXMEM;
     assign branch_or_jal = (zero & Branch_IDEX) | Jal_IDEX;
     assign branch_or_jump = branch_or_jal | Jalr_IDEX;
     assign is_compress = (instruction_IFID[1:0] != 2'b11);
     assign mux9 = (true_instruction[1:0] == 2'b11) ? PC_r + 4 : PC_r + 2;
-
+    assign PC_r_plus2 = PC_r + 2;
 
     always @(*) begin
         case (state_r)
             COMPLETE: begin
                 if (branch_or_jump) begin
                     if (mux4[1] == 1'b1) begin
-                        state_w <= PREPARE;
+                        state_w = PREPARE;
                     end
                     else begin
-                        state_w <= COMPLETE;
+                        state_w = COMPLETE;
                     end
-                    compression_buffer_w <= 16'd0;
+                    compression_buffer_w = 16'd0;
                 end
                 else if (instruction_w[1:0] == 2'b11) begin
-                    state_w <= COMPLETE;
-                    compression_buffer_w <= 16'd0;
+                    state_w = COMPLETE;
+                    compression_buffer_w = 16'd0;
                 end
                 else begin
-                    state_w <= INCOMPLETE;
-                    compression_buffer_w <= instruction_w[31:16];
+                    state_w = INCOMPLETE;
+                    compression_buffer_w = instruction_w[31:16];
                 end
             end
             INCOMPLETE: begin
                 if (branch_or_jump) begin
                     if (mux4[1] == 1'b1) begin
-                        state_w <= PREPARE;
+                        state_w = PREPARE;
                     end
                     else begin
-                        state_w <= COMPLETE;
+                        state_w = COMPLETE;
                     end
-                    compression_buffer_w <= 16'd0;
+                    compression_buffer_w = 16'd0;
                 end
                 else if (compression_buffer_r[1:0] == 2'b11) begin
-                    state_w <= INCOMPLETE;
-                    compression_buffer_w <= instruction_w[31:16];
+                    state_w = INCOMPLETE;
+                    compression_buffer_w = instruction_w[31:16];
                 end
                 else begin
-                    state_w <= COMPLETE;
-                    compression_buffer_w <= 16'd0;
+                    state_w = COMPLETE;
+                    compression_buffer_w = 16'd0;
                 end
             end
             PREPARE: begin
-                state_w <= INCOMPLETE;
-                compression_buffer_w <= instruction_w[31:16];
+                state_w = INCOMPLETE;
+                compression_buffer_w = instruction_w[31:16];
             end
             default: begin
-                state_w <= COMPLETE;
-                compression_buffer_w <= 16'd0;
+                state_w = COMPLETE;
+                compression_buffer_w = 16'd0;
             end
         endcase
     end
@@ -181,16 +181,16 @@ module RISCV_Pipeline (
     always @(*) begin
         case (state_r)
             COMPLETE: begin
-                true_instruction <= instruction_w;
+                true_instruction = instruction_w;
             end
             INCOMPLETE: begin
-                true_instruction <= {instruction_w[15:0], compression_buffer_r};
+                true_instruction = {instruction_w[15:0], compression_buffer_r};
             end
             PREPARE: begin
-               true_instruction <= 32'b000000000000_00000_000_00000_0010011; //addi r0, r0, 0
+               true_instruction = 32'b000000000000_00000_000_00000_0010011; //addi r0, r0, 0
             end
             default: begin
-               true_instruction <= 32'b000000000000_00000_000_00000_0010011; //addi r0, r0, 0
+               true_instruction = 32'b000000000000_00000_000_00000_0010011; //addi r0, r0, 0
             end
         endcase
     end
@@ -199,7 +199,7 @@ module RISCV_Pipeline (
         if(rst_n == 1'b0) begin
             PC_r <= 32'd0;
         end
-        else if (stall) begin
+        else if (stall | state_r == PREPARE) begin
             PC_r <= PC_r;
         end
         else begin

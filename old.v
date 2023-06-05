@@ -93,7 +93,7 @@ module RISCV_Pipeline (
     assign PC_r_IDEX_plus4 = PC_r_IDEX + 4;
     assign mux6 = (ForwardA[1])? mux8 : (ForwardA[0])? mux1 : RS1_data_IDEX; // Forwarding
     assign mux7 = (ForwardB[1])? mux8 : (ForwardB[0])? mux1 : RS2_data_IDEX; 
-    assign mux8 = (Jal_IDEX | Jalr_IDEX) ? PC_r_EXMEM_plus4 : alu_result_EXMEM;
+    assign mux8 = (Jal_EXMEM | Jalr_EXMEM) ? PC_r_EXMEM_plus4 : alu_result_EXMEM;
     assign branch_or_jal = (zero & Branch_IDEX) | Jal_IDEX;
     assign branch_or_jump = branch_or_jal | Jalr_IDEX;
 
