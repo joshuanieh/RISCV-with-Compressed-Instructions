@@ -25,16 +25,16 @@
 	`define IMEM_INIT "I_mem_compression"
 	`include "./TestBed_compression.v"
 `endif
-// `ifdef decompression
+`ifdef decompression
 	`define IMEM_INIT "I_mem_decompression"
 	`include "./TestBed_compression.v"
-// `endif			
+`endif			
 
 module Final_tb;
 
 	reg clk;
 	reg rst_n;
-	
+
 	wire mem_read_D;
 	wire mem_write_D;
 	wire [31:4] mem_addr_D;
@@ -48,21 +48,20 @@ module Final_tb;
 	wire [127:0] mem_wdata_I;
 	wire [127:0] mem_rdata_I;
 	wire mem_ready_I;
-	
+
 	wire [29:0]	DCACHE_addr;
 	wire [31:0]	DCACHE_wdata;
 	wire 		DCACHE_wen;
-	
+
 	wire [7:0] error_num;
 	wire [15:0] duration;
 	wire finish;	
-	wire [31:0] PC;
 
 	// Note the design is connected at testbench, include:
 	// 1. CHIP (RISCV + D_cache + I_chache)
 	// 2. slow memory for data
 	// 3. slow memory for instruction
-	
+
 	CHIP chip0 (clk,
 				rst_n,
 //----------for slow_memD------------	
@@ -82,10 +81,9 @@ module Final_tb;
 //----------for TestBed--------------				
 				DCACHE_addr,
 				DCACHE_wdata,
-				DCACHE_wen,
-				PC
+				DCACHE_wen
 				);
-	
+
 	slow_memory slow_memD(
 		.clk        (clk)           ,
 		.mem_read   (mem_read_D)    ,
@@ -116,11 +114,11 @@ module Final_tb;
 		.duration   (duration)      ,
 		.finish     (finish)
 	);
-	
+
 `ifdef SDF
     initial $sdf_annotate(`SDFFILE, chip0);
 `endif
-	
+
 // Initialize the data memory
 	initial begin
 		$display("-----------------------------------------------------\n");
@@ -130,19 +128,19 @@ module Final_tb;
 		$readmemh (`IMEM_INIT, slow_memI.mem ); // initialize data in IMEM
 
 		// waveform dump
-	    $dumpfile("Final.vcd");
-	    $dumpvars;
-	    // $fsdbDumpfile("Final.fsdb");			
-		// $fsdbDumpvars(0,Final_tb,"+mda");
-		// $fsdbDumpvars;
-	
+	    // $dumpfile("Final.vcd");
+	    // $dumpvars;
+	    $fsdbDumpfile("Final.fsdb");			
+		$fsdbDumpvars(0,Final_tb,"+mda");
+		$fsdbDumpvars;
+
 		clk = 0;
 		rst_n = 1'b1;
 		#(`CYCLE*0.6) rst_n = 1'b0;
 		#(`CYCLE*8.9) 
 		#0.1 rst_n = 1'b1;
-     
-		#(`CYCLE*200) // calculate clock cycles for all operation (you can modify it)
+
+		#(`CYCLE*10000) // calculate clock cycles for all operation (you can modify it)
 		$display("============================================================================");
 		$display("\n           Error!!! There is something wrong with your code ...!          ");
 		$display("\n                       The test result is .....FAIL                     \n");
@@ -153,11 +151,11 @@ module Final_tb;
 			$display("Possible solution: The clock cycles may be too small. Please modify it.\n");
 	 	$finish;
 	end
-		
+
 	always #(`CYCLE*0.5) clk = ~clk;
-	
+
 	always@(finish)
 	    if(finish)
 	       #(`CYCLE) $finish;		   
-	
+
 endmodule

@@ -74,7 +74,10 @@ module cache(
     assign proc_tag = proc_addr[26+2+2-1:2+2];
     assign proc_modulo = proc_addr[2+2-1:2];
     assign proc_offset = proc_addr[2-1:0];
-
+wire [25:0] test_tag0 = tag_r[proc_modulo][0];
+wire [25:0] test_tag1 = tag_r[proc_modulo][1];
+wire        test_valid0 = valid_r[proc_modulo][0];
+wire        test_valid1 = valid_r[proc_modulo][1];
     //Control signal
     assign read_hit = proc_read && ((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
     assign read_miss = proc_read && !((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));

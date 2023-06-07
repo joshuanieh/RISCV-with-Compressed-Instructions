@@ -77,7 +77,7 @@ EF_F0_DF_F5 // 1_1110101110_1_11111111_00001_1101111   //0xB0// jal  x1  0xFFFAE
 //    0x58     //                 bne  x15 x0  MultLoop   // loop condition
 //    0x5C     //                 sw   x13 x0  0x008      // store mult result
 //    0x60     //                 jalr x0  x2  0x000      // return Mult
-//    0x64     // Main          : addi x8  x0  0x168
+//    0x64     // Main          : addi x8  x0  0x168      // begin symbol
 //    0x68     //                 addi x14 x0  0x000      // set x14 = 0
 //    0x6C     //                 jal  x1  OutputTestPort
 //    0x70     //                 addi x8  x0  0x0DE
@@ -95,7 +95,7 @@ EF_F0_DF_F5 // 1_1110101110_1_11111111_00001_1101111   //0xB0// jal  x1  0xFFFAE
 //    0xA0     //                 nop
 //    0xA4     //                 addi x8  x0  0x800      // x8 = 0xFFFFF800
 //    0xA8     //                 srai x8  x8  11         // x8 = 0xFFFFFFFF
-//    0xAC     //                 xori x8  x8  0x2A2      // x8 = 0xFFFFFD5D
+//    0xAC     //                 xori x8  x8  0x2A2      // x8 = 0xFFFFFD5D, end symbol
 //    0xB0     //                 jal  x1  OutputTestPort
 //    0xB4     //                 nop
 //    0xB8     //                 nop

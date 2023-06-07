@@ -91,7 +91,7 @@ module RISCV_Pipeline (
     assign DCACHE_wdata = {RS2_data_EXMEM[7:0], RS2_data_EXMEM[15:8], RS2_data_EXMEM[23:16], RS2_data_EXMEM[31:24]};
     assign PC = PC_r;
 always@* $monitorh(PC);
-///////////////////////////////////////+4 should be changed//////////////////////////////////
+
 //internal wire
     assign mem_data = {DCACHE_rdata[7:0], DCACHE_rdata[15:8], DCACHE_rdata[23:16], DCACHE_rdata[31:24]};
     assign instruction_w = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]};
@@ -348,7 +348,7 @@ always@* $monitorh(PC);
         .MemRead_i(MemRead_IDEX),
         .MemWrite_i(MemWrite_IDEX),
         .ALUResult_i(alu_result),
-        .RS2data_i(RS2_data_IDEX),
+        .RS2data_i(mux7),
         .RDaddr_i(RDaddr_IDEX),
 
         .PC_o(PC_r_EXMEM_plus4),

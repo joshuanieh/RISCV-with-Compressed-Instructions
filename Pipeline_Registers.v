@@ -164,7 +164,7 @@ module EXMEM(
     MemWrite_o,
     ALUResult_o,
     RS2data_o,
-    RDaddr_o,
+    RDaddr_o
 );
     input             clk, rst_n, Stall, Jalr_i, Jal_i, RegWrite_i, MemtoReg_i, MemRead_i, MemWrite_i;
     input      [31:0] PC_i, ALUResult_i, RS2data_i;
