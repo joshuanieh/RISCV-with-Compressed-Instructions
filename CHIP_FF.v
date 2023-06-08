@@ -2,6 +2,7 @@
 
 `include "RISCV_Pipeline.v"
 `include "cache_instant.v"
+// `include "cache.v"
 
 module CHIP (	clk,
 				rst_n,
@@ -64,6 +65,17 @@ wire        DCACHE_stall;
 wire [31:0] DCACHE_rdata;
 wire [31:0] PC;
 
+
+wire [127:0] mem_rdata_D_wire;
+wire         mem_ready_D_wire;
+wire [127:0] mem_rdata_I_wire;
+wire         mem_ready_I_wire;
+
+reg [127:0] mem_rdata_I_reg;
+reg         mem_ready_I_reg;
+reg [127:0] mem_rdata_D_reg;
+reg         mem_ready_D_reg;
+
 //=========================================
 	// Note that the overall design of your RISCV includes:
 	// 1. pipelined RISCV processor
@@ -107,8 +119,8 @@ wire [31:0] PC;
         .mem_write  (mem_write_D) ,
         .mem_addr   (mem_addr_D)  ,
         .mem_wdata  (mem_wdata_D) ,
-        .mem_rdata  (mem_rdata_D) ,
-        .mem_ready  (mem_ready_D)
+        .mem_rdata  (mem_rdata_D_wire) ,
+        .mem_ready  (mem_ready_D_wire)
 	);
 
 	cache I_cache(
@@ -124,9 +136,22 @@ wire [31:0] PC;
         .mem_write  (mem_write_I) ,
         .mem_addr   (mem_addr_I)  ,
         .mem_wdata  (mem_wdata_I) ,
-        .mem_rdata  (mem_rdata_I) ,
-        .mem_ready  (mem_ready_I)
+        .mem_rdata  (mem_rdata_I_wire) ,
+        .mem_ready  (mem_ready_I_wire)
 	);
+
+	assign mem_rdata_I_wire = mem_rdata_I_reg;
+    assign mem_ready_I_wire = mem_ready_I_reg;
+	assign mem_rdata_D_wire = mem_rdata_D_reg;
+    assign mem_ready_D_wire = mem_ready_D_reg;
+
+	always @(posedge clk) begin
+		mem_rdata_I_reg <= mem_rdata_I;
+		mem_ready_I_reg <= mem_ready_I;
+		mem_rdata_D_reg <= mem_rdata_D;
+		mem_ready_D_reg <= mem_ready_D;
+		
+	end
 
 
 endmodule

@@ -25,10 +25,10 @@
 	`define IMEM_INIT "I_mem_compression"
 	`include "./TestBed_compression.v"
 `endif
-`ifdef decompression
+// `ifdef decompression
 	`define IMEM_INIT "I_mem_decompression"
 	`include "./TestBed_compression.v"
-`endif			
+// `endif			
 
 module Final_tb;
 
@@ -56,6 +56,7 @@ module Final_tb;
 	wire [7:0] error_num;
 	wire [15:0] duration;
 	wire finish;	
+	wire [31:0] PC;
 
 	// Note the design is connected at testbench, include:
 	// 1. CHIP (RISCV + D_cache + I_chache)
@@ -81,7 +82,8 @@ module Final_tb;
 //----------for TestBed--------------				
 				DCACHE_addr,
 				DCACHE_wdata,
-				DCACHE_wen
+				DCACHE_wen,
+				PC
 				);
 
 	slow_memory slow_memD(
@@ -128,18 +130,18 @@ module Final_tb;
 		$readmemh (`IMEM_INIT, slow_memI.mem ); // initialize data in IMEM
 
 		// waveform dump
-	    // $dumpfile("Final.vcd");
-	    // $dumpvars;
-	    $fsdbDumpfile("Final.fsdb");			
-		$fsdbDumpvars(0,Final_tb,"+mda");
-		$fsdbDumpvars;
+	    $dumpfile("Final.vcd");
+	    $dumpvars;
+	    // $fsdbDumpfile("Final.fsdb");			
+		// $fsdbDumpvars(0,Final_tb,"+mda");
+		// $fsdbDumpvars;
 
 		clk = 0;
 		rst_n = 1'b1;
 		#(`CYCLE*0.6) rst_n = 1'b0;
 		#(`CYCLE*8.9) 
 		#0.1 rst_n = 1'b1;
-
+//10000
 		#(`CYCLE*10000) // calculate clock cycles for all operation (you can modify it)
 		$display("============================================================================");
 		$display("\n           Error!!! There is something wrong with your code ...!          ");

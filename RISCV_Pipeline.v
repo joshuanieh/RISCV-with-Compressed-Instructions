@@ -91,7 +91,7 @@ module RISCV_Pipeline (
     assign DCACHE_addr = alu_result_EXMEM[31:2];
     assign DCACHE_wdata = {RS2_data_EXMEM[7:0], RS2_data_EXMEM[15:8], RS2_data_EXMEM[23:16], RS2_data_EXMEM[31:24]};
     assign PC = PC_r;
-always@* $monitorh(PC);
+// always@* $monitorh(PC);
 
 //internal wire
     assign mem_data = {DCACHE_rdata[7:0], DCACHE_rdata[15:8], DCACHE_rdata[23:16], DCACHE_rdata[31:24]};
