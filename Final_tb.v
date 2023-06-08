@@ -25,10 +25,10 @@
 	`define IMEM_INIT "I_mem_compression"
 	`include "./TestBed_compression.v"
 `endif
-// `ifdef decompression
+`ifdef decompression
 	`define IMEM_INIT "I_mem_decompression"
 	`include "./TestBed_compression.v"
-// `endif			
+`endif			
 
 module Final_tb;
 
@@ -130,11 +130,11 @@ module Final_tb;
 		$readmemh (`IMEM_INIT, slow_memI.mem ); // initialize data in IMEM
 
 		// waveform dump
-	    $dumpfile("Final.vcd");
-	    $dumpvars;
-	    // $fsdbDumpfile("Final.fsdb");			
-		// $fsdbDumpvars(0,Final_tb,"+mda");
-		// $fsdbDumpvars;
+	    // $dumpfile("Final.vcd");
+	    // $dumpvars;
+	    $fsdbDumpfile("Final.fsdb");			
+		$fsdbDumpvars(0,Final_tb,"+mda");
+		$fsdbDumpvars;
 
 		clk = 0;
 		rst_n = 1'b1;
