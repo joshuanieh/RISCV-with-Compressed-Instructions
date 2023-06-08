@@ -74,6 +74,7 @@ module RISCV_Pipeline (
     reg    [31:0] true_instruction;
     wire          is_compress;
     wire          compress_IDEX;
+    wire          predict_wrong;
 
 //state
     parameter COMPLETE = 2'd0;   //Perfect border
@@ -100,14 +101,15 @@ always@* $monitorh(PC);
     assign mux3 = (!branch_or_jal) ? mux9 : PC_r_IDEX + immgen_result_IDEX;
     assign mux4 = (Jalr_IDEX == 1'b0) ? mux3 : alu_result;
     assign mux5 = (MemtoReg_MEMWB == 1'b0) ? alu_result_MEMWB : mem_data_MEMWB;
-    assign stall_mem = ICACHE_stall | DCACHE_stall; // stall due to memory access
-    assign stall = stall_mem | stall_load_use;      // stall due to memory access and load use data hazard 
+    assign branch_or_jal = (zero & Branch_IDEX) | Jal_IDEX;
+    assign branch_or_jump = branch_or_jal | Jalr_IDEX;
+    assign predict_wrong = branch_or_jump;
+    assign stall_mem = (ICACHE_stall & ~ predict_wrong) | DCACHE_stall; // stall due to memory access
+    assign stall = stall_mem | (stall_load_use & ~ predict_wrong);      // stall due to memory access and load use data hazard 
     assign PC_r_IDEX_plus4 = (compress_IDEX == 1'b1) ? PC_r_IDEX + 2 : PC_r_IDEX + 4;
     assign mux6 = (ForwardA[1])? mux8 : (ForwardA[0])? mux1 : RS1_data_IDEX; // Forwarding
     assign mux7 = (ForwardB[1])? mux8 : (ForwardB[0])? mux1 : RS2_data_IDEX; 
     assign mux8 = (Jal_EXMEM | Jalr_EXMEM) ? PC_r_EXMEM_plus4 : alu_result_EXMEM;
-    assign branch_or_jal = (zero & Branch_IDEX) | Jal_IDEX;
-    assign branch_or_jump = branch_or_jal | Jalr_IDEX;
     assign is_compress = (instruction_IFID[1:0] != 2'b11);
     assign mux9 = (true_instruction[1:0] == 2'b11) ? PC_r + 4 : PC_r + 2;
     assign PC_r_plus2 = PC_r + 2;
