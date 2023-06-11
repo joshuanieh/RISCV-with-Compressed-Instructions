@@ -66,7 +66,7 @@ module RISCV_Pipeline (
     wire   [3:0]  ALUCtrl, ALUCtrl_in;
     wire   [31:0] RS1_data, RS2_data, immgen_result, mem_data, decompressed_instruction, mux9, mux10, instruction_IFID;
     wire   [31:0] mux1, mux2, mux3, mux4, mux5, mux6, mux7, mux8, alu_result, PC_predict, PC_add_imm;
-    wire          zero, stall_mem, branch_or_jal, branch_or_jump, stall, stall_load_use, Flush_IFID, Flush_IDEX;
+    wire          zero, stall_mem, branch_or_jal, branch_or_jump, stall, stall_load_use, Flush_IFID, Flush_IDEX, next_complete, to_branch;
     wire          Jalr, Jal, Branch, MemtoReg, MemWrite, MemRead, ALUSrc, RegWrite, take_branch_IFID, take_branch_IDEX;
     wire          Jalr_IDEX, Jal_IDEX, Branch_IDEX, ALUSrc_IDEX, MemRead_IDEX, MemWrite_IDEX, MemtoReg_IDEX, RegWrite_IDEX;
     wire          Jalr_EXMEM, Jal_EXMEM, MemRead_EXMEM, MemWrite_EXMEM, MemtoReg_EXMEM, RegWrite_EXMEM;
@@ -101,7 +101,7 @@ module RISCV_Pipeline (
     assign instruction_w = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]};
     assign mux1 = ((Jal_MEMWB | Jalr_MEMWB) == 1'b0) ? mux5 : PC_r_MEMWB_plus4;
     assign mux2 = (ALUSrc_IDEX == 1'b0) ? mux7 : immgen_result_IDEX;
-    assign mux3 = (Jalr_IDEX) ? alu_result : (Jal_IDEX | taken) ? PC_add_imm : PC_r_IDEX_plus4 ;
+    assign mux3 = (Jalr_IDEX) ? alu_result : (Jal_IDEX | taken) ? PC_add_imm : PC_r_IDEX_plus4;
     assign mux4 = (branch_or_jump) ? mux3 : mux10; // !!! modify to predict_wrong
     assign mux5 = (MemtoReg_MEMWB == 1'b0) ? alu_result_MEMWB : mem_data_MEMWB;
     assign branch_or_jal = predict_wrong | Jal_IDEX;
@@ -116,12 +116,14 @@ module RISCV_Pipeline (
     assign is_compress = (instruction_IFID[1:0] != 2'b11);
     assign mux9 = (true_instruction[1:0] == 2'b11) ? PC_r + 4 : PC_r + 2;
     assign PC_r_plus2 = PC_r + 2;
-    assign mux10 = (is_branch & take_branch)? PC_predict : mux9;
+    assign mux10 = (to_branch)? PC_predict : mux9;
     assign is_branch = (true_instruction[6:0] == 7'b1100011) | ((true_instruction[15:14] == 2'b11) & (true_instruction[1:0] == 2'b01));
     assign is_jal = (true_instruction[6:0] == 7'b1101111) | ((true_instruction[14:13] == 2'b01) & (true_instruction[1:0] == 2'b01));
     assign taken = Branch_IDEX & zero;
     assign not_taken = Branch_IDEX & !zero;
     assign PC_add_imm = PC_r_IDEX + immgen_result_IDEX;
+    assign to_branch = is_branch & take_branch;
+    assign next_complete = ! PC_predict[1];
 
     always @(*) begin
         case (state_r)
@@ -135,7 +137,7 @@ module RISCV_Pipeline (
                     end
                     compression_buffer_w = 16'd0;
                 end
-                else if (instruction_w[1:0] == 2'b11) begin
+                else if (instruction_w[1:0] == 2'b11 | (to_branch & next_complete)) begin
                     state_w = COMPLETE;
                     compression_buffer_w = 16'd0;
                 end
@@ -154,7 +156,7 @@ module RISCV_Pipeline (
                     end
                     compression_buffer_w = 16'd0;
                 end
-                else if (compression_buffer_r[1:0] == 2'b11) begin
+                else if (compression_buffer_r[1:0] == 2'b11 | (to_branch & !next_complete)) begin
                     state_w = INCOMPLETE;
                     compression_buffer_w = instruction_w[31:16];
                 end
