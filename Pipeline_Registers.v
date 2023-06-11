@@ -5,26 +5,32 @@ module IFID(
     Flush,
     instr_i,
     PC_i,
+    take_branch_i,
     instr_o,
-    PC_o
+    PC_o,
+    take_branch_o
 );
-    input             Stall, Flush, clk, rst_n;
+    input             Stall, Flush, clk, rst_n, take_branch_i;
     input      [31:0] PC_i;
     input      [31:0] instr_i;
+    output reg        take_branch_o;
     output reg [31:0] instr_o, PC_o;
 
     always @(posedge clk) begin
         if (!rst_n | Flush) begin
             instr_o <= {27'b0, 5'b10011};  // NOP instruction
             PC_o    <= 32'b0;
+            take_branch_o <= 0;
         end
         else if (Stall) begin
             instr_o <= instr_o;
             PC_o    <= PC_o;
+            take_branch_o <= take_branch_o;
         end
         else begin
             instr_o <= instr_i;
             PC_o    <= PC_i;
+            take_branch_o <= take_branch_i;
         end
     end
 endmodule
@@ -52,6 +58,8 @@ module IDEX(
     RDaddr_i,
     funct_i,              // input of ALU control : instr[30, 14:12]
     imm_i,
+    take_branch_i,
+
     PC_o,
     Jalr_o,
     Jal_o,
@@ -69,15 +77,16 @@ module IDEX(
     RDaddr_o,
     funct_o,
     imm_o,
+    take_branch_o,
     compress_o
 );
-    input             clk, rst_n, compress_i, Stall, Flush, Jalr_i, Jal_i, Branch_i, ALUSrc_i, RegWrite_i, MemtoReg_i, MemRead_i, MemWrite_i;
+    input             clk, rst_n, compress_i, Stall, Flush, Jalr_i, Jal_i, Branch_i, ALUSrc_i, RegWrite_i, MemtoReg_i, MemRead_i, MemWrite_i, take_branch_i;
     input      [1:0]  ALUOp_i;
     input      [31:0] RS1data_i, RS2data_i, PC_i, imm_i;
     input      [3:0]  funct_i;
     input      [4:0]  RS1addr_i, RS2addr_i, RDaddr_i;
     output reg [1:0]  ALUOp_o;
-    output reg        Jalr_o, Jal_o, Branch_o, ALUSrc_o, RegWrite_o, MemtoReg_o, MemRead_o, MemWrite_o, compress_o;
+    output reg        Jalr_o, Jal_o, Branch_o, ALUSrc_o, RegWrite_o, MemtoReg_o, MemRead_o, MemWrite_o, compress_o, take_branch_o;
     output reg [31:0] RS1data_o, RS2data_o, PC_o, imm_o;
     output reg [3:0]  funct_o;
     output reg [4:0]  RS1addr_o, RS2addr_o, RDaddr_o;
@@ -95,7 +104,8 @@ module IDEX(
             ALUOp_o    <= 0;
             ALUSrc_o   <= 0;
             PC_o       <= 32'b0;
-            RDaddr_o    <= 0;
+            RDaddr_o   <= 0;
+            take_branch_o <= 0;
         end 
         else if (Stall) begin
             compress_o <= compress_o;
@@ -116,6 +126,7 @@ module IDEX(
             RDaddr_o   <= RDaddr_o;
             PC_o       <= PC_o;
             imm_o      <= imm_o;
+            take_branch_o <= take_branch_o;
         end
         else begin
             compress_o <= compress_i;
@@ -136,6 +147,7 @@ module IDEX(
             RDaddr_o   <= RDaddr_i;
             PC_o       <= PC_i;
             imm_o      <= imm_i;
+            take_branch_o <= take_branch_i;
         end
 
     end
