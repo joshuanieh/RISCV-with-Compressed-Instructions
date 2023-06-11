@@ -128,7 +128,7 @@ module RISCV_Pipeline (
     always @(*) begin
         case (state_r)
             COMPLETE: begin
-                if (branch_or_jump) begin
+                if (branch_or_jump | to_branch) begin
                     if (mux4[1] == 1'b1) begin
                         state_w = PREPARE;
                     end
@@ -137,7 +137,7 @@ module RISCV_Pipeline (
                     end
                     compression_buffer_w = 16'd0;
                 end
-                else if (instruction_w[1:0] == 2'b11 | (to_branch & next_complete)) begin
+                else if (instruction_w[1:0] == 2'b11) begin
                     state_w = COMPLETE;
                     compression_buffer_w = 16'd0;
                 end
@@ -147,7 +147,7 @@ module RISCV_Pipeline (
                 end
             end
             INCOMPLETE: begin
-                if (branch_or_jump) begin
+                if (branch_or_jump | to_branch) begin
                     if (mux4[1] == 1'b1) begin
                         state_w = PREPARE;
                     end
@@ -156,7 +156,7 @@ module RISCV_Pipeline (
                     end
                     compression_buffer_w = 16'd0;
                 end
-                else if (compression_buffer_r[1:0] == 2'b11 | (to_branch & !next_complete)) begin
+                else if (compression_buffer_r[1:0] == 2'b11) begin
                     state_w = INCOMPLETE;
                     compression_buffer_w = instruction_w[31:16];
                 end
