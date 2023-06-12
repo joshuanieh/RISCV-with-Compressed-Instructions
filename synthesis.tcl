@@ -39,6 +39,8 @@ compile
 write_sdf -version 2.1 CHIP_syn.sdf
 write -format verilog -hier -output CHIP_syn.v
 write -format ddc     -hier -output CHIP_syn.ddc  
+report_timing
+report_area
 #####################################################  
 
 
