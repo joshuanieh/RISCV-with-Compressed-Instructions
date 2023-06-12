@@ -242,7 +242,7 @@ module RISCV_Pipeline (
         .MemRead_i(MemRead_IDEX),
         .MemWrite_i(MemWrite_IDEX),
         .ALUResult_i(alu_result),
-        .RS2data_i(RS2_data_IDEX),
+	.RS2data_i(mux7),
         .RDaddr_i(RDaddr_IDEX),
 
         .PC_o(PC_r_EXMEM_plus4),
