@@ -1,6 +1,6 @@
 module PC_predictor (
     PC,
-    instr,        // compute PC + imm for both JAL and BRANCH
+    instr,        // compute PC + imm for JAL
     PC_predict
 );
 
@@ -15,12 +15,10 @@ module PC_predictor (
 
     always @(*) begin
         if (is_compress) begin
-            if (instr[14]) imm = {{24{instr[12]}}, instr[6:5], instr[2], instr[11:10], instr[4], instr[3], 1'b0};
-            else imm = {{21{instr[12]}}, instr[8], instr[10:9], instr[6], instr[7], instr[2], instr[11], instr[5:3], 1'b0};
+            imm = {{21{instr[12]}}, instr[8], instr[10:9], instr[6], instr[7], instr[2], instr[11], instr[5:3], 1'b0};
         end
         else begin
-            if (instr[2]) imm = {{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0};
-            else imm = {{20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0};
+            imm = {{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0};
         end
     end
     

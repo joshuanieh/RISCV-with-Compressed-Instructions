@@ -13,7 +13,6 @@ Description:
 `include "Forwarding_Unit.v"
 `include "Hazard_Detection_Unit.v"
 `include "decompressor.v"
-`include "Branch_Prediction_Unit.v"
 `include "PC_predictor.v"
 
 module RISCV_Pipeline (
@@ -62,19 +61,19 @@ module RISCV_Pipeline (
     wire   [4:0]  RS1addr_IDEX, RS2addr_IDEX, RDaddr_IDEX, RDaddr_EXMEM, RDaddr_MEMWB;
     wire   [31:0] instruction_w, PC_r_IFID, PC_r_IDEX, PC_r_IDEX_plus4, PC_r_EXMEM_plus4, PC_r_MEMWB_plus4, RS1_data_IDEX, PC_r_plus2;
     wire   [31:0] RS2_data_IDEX, RS2_data_EXMEM, immgen_result_IDEX, alu_result_EXMEM, alu_result_MEMWB, mem_data_MEMWB;
-    wire   [1:0]  ALUOp, ALUOp_IDEX, ForwardA, ForwardB;
+    wire   [1:0]  ALUOp, ALUOp_IDEX, ForwardA, ForwardB;//, ForwardC, ForwardD;
     wire   [3:0]  ALUCtrl, ALUCtrl_in;
-    wire   [31:0] RS1_data, RS2_data, immgen_result, mem_data, decompressed_instruction, mux9, mux10, instruction_IFID;
+    wire   [31:0] RS1_data, RS2_data, immgen_result, mem_data, decompressed_instruction, mux9, mux10, instruction_IFID;//, RS1_data_forward, RS2_data_forward;
     wire   [31:0] mux1, mux2, mux3, mux4, mux5, mux6, mux7, mux8, alu_result, PC_predict, PC_add_imm;
-    wire          zero, stall_mem, branch_or_jal, branch_or_jump, stall, stall_load_use, Flush_IFID, Flush_IDEX, next_complete, to_branch;
-    wire          Jalr, Jal, Branch, MemtoReg, MemWrite, MemRead, ALUSrc, RegWrite, take_branch_IFID, take_branch_IDEX;
+    wire          zero, stall_mem, branch_or_jump, stall, stall_load_use, Flush_IFID, Flush_IDEX, Stall_jal;
+    wire          Jalr, Jal, Branch, MemtoReg, MemWrite, MemRead, ALUSrc, RegWrite;
     wire          Jalr_IDEX, Jal_IDEX, Branch_IDEX, ALUSrc_IDEX, MemRead_IDEX, MemWrite_IDEX, MemtoReg_IDEX, RegWrite_IDEX;
     wire          Jalr_EXMEM, Jal_EXMEM, MemRead_EXMEM, MemWrite_EXMEM, MemtoReg_EXMEM, RegWrite_EXMEM;
     wire          Jalr_MEMWB, Jal_MEMWB, MemtoReg_MEMWB, RegWrite_MEMWB;
     reg    [15:0] compression_buffer_r, compression_buffer_w; //For compression extention
     reg    [1:0]  state_r, state_w; //For compression extention
     reg    [31:0] true_instruction;
-    wire          is_compress, is_branch, is_jal, taken, not_taken, take_branch;
+    wire          is_compress, is_jal;
     wire          compress_IDEX;
     wire          predict_wrong;
 
@@ -101,14 +100,13 @@ module RISCV_Pipeline (
     assign instruction_w = {ICACHE_rdata[7:0], ICACHE_rdata[15:8], ICACHE_rdata[23:16], ICACHE_rdata[31:24]};
     assign mux1 = ((Jal_MEMWB | Jalr_MEMWB) == 1'b0) ? mux5 : PC_r_MEMWB_plus4;
     assign mux2 = (ALUSrc_IDEX == 1'b0) ? mux7 : immgen_result_IDEX;
-    assign mux3 = (Jalr_IDEX) ? alu_result : (Jal_IDEX | taken) ? PC_add_imm : PC_r_IDEX_plus4;
-    assign mux4 = (branch_or_jump) ? mux3 : mux10; // !!! modify to predict_wrong
+    assign mux3 = (Jalr_IDEX) ? alu_result : PC_add_imm;
+    assign mux4 = (branch_or_jump) ? mux3 : mux10; 
     assign mux5 = (MemtoReg_MEMWB == 1'b0) ? alu_result_MEMWB : mem_data_MEMWB;
-    assign branch_or_jal = predict_wrong | Jal_IDEX;
-    assign branch_or_jump = branch_or_jal | Jalr_IDEX;
-    assign predict_wrong = Branch_IDEX & (zero ^ take_branch_IDEX);
+    assign branch_or_jump = predict_wrong | Jalr_IDEX;
+    assign predict_wrong = Branch_IDEX & zero;
     assign stall_mem = (ICACHE_stall & ~ branch_or_jump) | DCACHE_stall; // stall due to memory access
-    assign stall = stall_mem | (stall_load_use);      // stall due to memory access and load use data hazard 
+    assign stall = stall_mem | stall_load_use | Stall_jal;      // stall due to memory access and load use data hazard 
     assign PC_r_IDEX_plus4 = (compress_IDEX == 1'b1) ? PC_r_IDEX + 2 : PC_r_IDEX + 4;
     assign mux6 = (ForwardA[1])? mux8 : (ForwardA[0])? mux1 : RS1_data_IDEX; // Forwarding
     assign mux7 = (ForwardB[1])? mux8 : (ForwardB[0])? mux1 : RS2_data_IDEX; 
@@ -116,19 +114,14 @@ module RISCV_Pipeline (
     assign is_compress = (instruction_IFID[1:0] != 2'b11);
     assign mux9 = (true_instruction[1:0] == 2'b11) ? PC_r + 4 : PC_r + 2;
     assign PC_r_plus2 = PC_r + 2;
-    assign mux10 = (to_branch)? PC_predict : mux9;
-    assign is_branch = (true_instruction[6:0] == 7'b1100011) | ((true_instruction[15:14] == 2'b11) & (true_instruction[1:0] == 2'b01));
+    assign mux10 = (is_jal)? PC_predict : mux9;
     assign is_jal = (true_instruction[6:0] == 7'b1101111) | ((true_instruction[14:13] == 2'b01) & (true_instruction[1:0] == 2'b01));
-    assign taken = Branch_IDEX & zero;
-    assign not_taken = Branch_IDEX & !zero;
     assign PC_add_imm = PC_r_IDEX + immgen_result_IDEX;
-    assign to_branch = is_branch & take_branch;
-    assign next_complete = ! PC_predict[1];
 
     always @(*) begin
         case (state_r)
             COMPLETE: begin
-                if (branch_or_jump | to_branch) begin
+                if (branch_or_jump | is_jal) begin
                     if (mux4[1] == 1'b1) begin
                         state_w = PREPARE;
                     end
@@ -147,7 +140,7 @@ module RISCV_Pipeline (
                 end
             end
             INCOMPLETE: begin
-                if (branch_or_jump | to_branch) begin
+                if (branch_or_jump | is_jal) begin
                     if (mux4[1] == 1'b1) begin
                         state_w = PREPARE;
                     end
@@ -285,23 +278,20 @@ module RISCV_Pipeline (
 
     Hazard_Detection_Unit Hazard_Detection_Unit (
         .MemRead_i(MemRead_IDEX),
+        .Jalr_ID_i(Jalr),
         .RDaddr_i(RDaddr_IDEX),
         .RS1addr_i(decompressed_instruction[19:15]),
         .RS2addr_i(decompressed_instruction[24:20]),
-        .BranchOrJump_i(branch_or_jump),
+        .Branch_ID_i(Branch),
+        .Predict_wrong_i(branch_or_jump),
+        .Jal_IF_i(is_jal),
+        .Jal_EX_i(Jal_IDEX),
         .Stall_load_use_o(stall_load_use),
+        .Stall_jal_o(Stall_jal),
         .Flush_IFID_o(Flush_IFID),
         .Flush_IDEX_o(Flush_IDEX)
     );
 
-    Branch_Prediction_Unit Branch_Prediction_Unit (
-        .clk(clk),
-        .rst_n(rst_n),
-        .stall(stall),
-        .taken(taken),
-        .not_taken(not_taken),
-        .take_branch(take_branch)
-    );
 
     PC_predictor PC_predictor (
         .PC(PC_r),
@@ -312,14 +302,12 @@ module RISCV_Pipeline (
     IFID IFID (
         .clk(clk),
         .rst_n(rst_n),
-        .Stall(stall),
-        .Flush(Flush_IFID & (~stall_mem)),
+        .Stall(stall_mem | stall_load_use),
+        .Flush(Flush_IFID & (~(stall_mem | stall_load_use))),
         .instr_i(true_instruction),
         .PC_i(PC_r),
-        .take_branch_i(take_branch),
         .instr_o(instruction_IFID),
-        .PC_o(PC_r_IFID),
-        .take_branch_o(take_branch_IFID)
+        .PC_o(PC_r_IFID)
     );
 
     IDEX IDEX (
@@ -345,7 +333,6 @@ module RISCV_Pipeline (
         .RDaddr_i(decompressed_instruction[11:7]),
         .funct_i({decompressed_instruction[30], decompressed_instruction[14:12]}),              // input of ALU control : instr[30, 14:12]
         .imm_i(immgen_result),
-        .take_branch_i(take_branch_IFID),
 
         .PC_o(PC_r_IDEX),
         .Jalr_o(Jalr_IDEX),
@@ -364,7 +351,6 @@ module RISCV_Pipeline (
         .RDaddr_o(RDaddr_IDEX),
         .funct_o(ALUCtrl_in),
         .imm_o(immgen_result_IDEX),
-        .take_branch_o(take_branch_IDEX),
         .compress_o(compress_IDEX)
     );
 
