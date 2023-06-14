@@ -1,8 +1,8 @@
 // Top module of your design, you cannot modify this module!!
 
 `include "RISCV_Pipeline.v"
-`include "cache_instant.v"
-// `include "cache.v"
+`include "cache.v"
+`include "cache_read_only.v"
 
 module CHIP (	clk,
 				rst_n,
@@ -123,7 +123,7 @@ reg         mem_ready_D_reg;
         .mem_ready  (mem_ready_D_wire)
 	);
 
-	cache I_cache(
+	cache_read_only I_cache(
         .clk        (clk)         ,
         .proc_reset (~rst_n)      ,
         .proc_read  (ICACHE_ren)  ,

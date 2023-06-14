@@ -1,9 +1,3 @@
-/*
-Module: CHIP
-Author: Chia-Jen Nieh
-Description:
-    It's a single cycle CPU. Remember to add an adder for Jalr when pipelining
-*/
 `include "alu_control.v"
 `include "alu.v"
 `include "control.v"

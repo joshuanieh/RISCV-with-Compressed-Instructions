@@ -55,7 +55,6 @@ module cache(
     wire   [2-1:0] proc_modulo;
     wire   [2-1:0] proc_offset;
 
-    wire           hit;
     wire           read_miss;
     wire           read_hit;
     wire           write_miss;
@@ -76,14 +75,13 @@ module cache(
     assign proc_offset = proc_addr[2-1:0];
 
     //Control signal
-    assign index = proc_tag == tag_r[proc_modulo][1];
-    assign hit = (proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]);
-    assign read_hit = proc_read && hit;
-    assign read_miss = proc_read && !hit;
-    assign write_hit = proc_write && hit;
-    assign write_miss = proc_write && !hit;
+    assign read_hit = proc_read && ((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
+    assign read_miss = proc_read && !((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
+    assign write_hit = proc_write && ((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
+    assign write_miss = proc_write && !((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
     assign old_valid_and_modified = valid_r[proc_modulo][~ recent_r[proc_modulo]] && modified_r[proc_modulo][~ recent_r[proc_modulo]];
 
+    assign index = proc_tag == tag_r[proc_modulo][1];
 
     //Handle state_r (FSM)
     always @(*) begin

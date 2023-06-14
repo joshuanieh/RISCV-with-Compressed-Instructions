@@ -15,8 +15,8 @@ module IFID(
 
     always @(posedge clk) begin
         if (!rst_n | Flush) begin
-            instr_o <= {27'b0, 5'b10011};  // NOP instruction
-            PC_o    <= 32'b0;
+            instr_o <= {27'd0, 5'b10011};  // NOP instruction
+            PC_o    <= 32'd0;
         end
         else if (Stall) begin
             instr_o <= instr_o;
@@ -85,18 +85,18 @@ module IDEX(
 
     always @(posedge clk) begin
         if (!rst_n | Flush) begin
-            compress_o <= 0;
-            Jalr_o     <= 0;
-            Jal_o      <= 0;
-            Branch_o   <= 0;
-            RegWrite_o <= 0;
-            MemtoReg_o <= 0;
-            MemRead_o  <= 0;
-            MemWrite_o <= 0;
-            ALUOp_o    <= 0;
-            ALUSrc_o   <= 0;
-            PC_o       <= 32'b0;
-            RDaddr_o   <= 0;
+            compress_o <= 1'b0;
+            Jalr_o     <= 1'b0;
+            Jal_o      <= 1'b0;
+            Branch_o   <= 1'b0;
+            RegWrite_o <= 1'b0;
+            MemtoReg_o <= 1'b0;
+            MemRead_o  <= 1'b0;
+            MemWrite_o <= 1'b0;
+            ALUOp_o    <= 2'd0;
+            ALUSrc_o   <= 1'b0;
+            PC_o       <= 32'd0;
+            RDaddr_o   <= 5'd0;
         end 
         else if (Stall) begin
             compress_o <= compress_o;
@@ -176,13 +176,13 @@ module EXMEM(
 
     always @(posedge clk) begin
         if (!rst_n) begin
-            Jalr_o      <= 0; 
-            Jal_o       <= 0;
-            RegWrite_o  <= 0;
-            MemtoReg_o  <= 0;
-            MemRead_o   <= 0;
-            MemWrite_o  <= 0;
-            RDaddr_o    <= 0;
+            Jalr_o      <= 1'b0; 
+            Jal_o       <= 1'b0;
+            RegWrite_o  <= 1'b0;
+            MemtoReg_o  <= 1'b0;
+            MemRead_o   <= 1'b0;
+            MemWrite_o  <= 1'b0;
+            RDaddr_o    <= 5'd0;
         end
         else if (Stall) begin
             Jalr_o      <= Jalr_o; 
@@ -241,11 +241,11 @@ module MEMWB(
 
     always @(posedge clk) begin
         if (!rst_n) begin
-            Jalr_o      <= 0;
-            Jal_o       <= 0;
-            RegWrite_o  <= 0;
-            MemtoReg_o  <= 0;
-            RDaddr_o    <= 0;
+            Jalr_o      <= 1'b0;
+            Jal_o       <= 1'b0;
+            RegWrite_o  <= 1'b0;
+            MemtoReg_o  <= 1'b0;
+            RDaddr_o    <= 5'd0;
         end
         else if (Stall) begin
             Jalr_o      <= Jalr_o;
