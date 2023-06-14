@@ -49,7 +49,6 @@ module cache(
     reg   [26-1:0] tag_w[0:4-1][0:2-1]; //tag bits for blocks
  
     reg            recent_r[0:4-1]; //recent bit for blocks, 1'b0 means cache_r[proc_modulo][0] is recently taken
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////Todo, dirty bit
     reg            recent_w[0:4-1]; //recent bit for blocks
 
     wire  [26-1:0] proc_tag;
@@ -281,8 +280,4 @@ module cache(
     assign mem_write = state_r == STATE_WRITE & ~ mem_ready;
     assign mem_addr = state_r == STATE_READ ? {proc_tag, proc_modulo} : {tag_r[proc_modulo][~ recent_r[proc_modulo]], proc_modulo};
     assign mem_wdata = cache_r[proc_modulo][~ recent_r[proc_modulo]];
-
-    // always @(*) begin
-    //     $monitor("proc addr: %h, read hit: %b, read miss: %b, write hit: %b, write miss: %b, mem ready: %b, mem read: %b, mem write: %b, mem addr: %h, mem wdata: %h, mem rdata: %h", proc_addr, read_hit, read_miss, write_hit, write_miss, mem_ready, mem_read, mem_write, mem_addr, mem_wdata, mem_rdata);
-    // end
 endmodule

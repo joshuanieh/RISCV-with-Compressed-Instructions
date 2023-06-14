@@ -120,8 +120,8 @@ module cache(
     assign proc_rdata = proc_rdata_reg;
 
     assign proc_stall = !hit && enable;
-    assign mem_read   = mem_read_reg;   
-    assign mem_write  = mem_write_reg; 
+    assign mem_read   = mem_read_reg & ~ mem_ready;   
+    assign mem_write  = mem_write_reg & ~ mem_ready; 
     assign mem_addr   = mem_addr_reg;
     assign mem_wdata  = mem_wdata_reg;
 
