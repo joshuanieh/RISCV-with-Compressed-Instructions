@@ -146,7 +146,7 @@ module cache(
         if (state_r == STATE_WRITE && mem_ready) begin //if write finish, set write buffer empty to true
             write_buffer_empty_w = 1'b1;
         end
-        else if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified && write_buffer_empty_r) begin //in ready state, if miss and old data valid and modified and at the same time the write buffer is empty, accomodate the old date 
+        else if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified) begin //in ready state, if miss and old data valid and modified, accomodate the old date 
             write_buffer_empty_w = 1'b0;
         end
     end
@@ -163,20 +163,33 @@ module cache(
     //Handle write_buffer_r
     always @(*) begin
         write_buffer_w = write_buffer_r;
-        write_buffer_tag_and_modulo_w = write_buffer_tag_and_modulo_r;
-        if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified && write_buffer_empty_r) begin //in ready state, if miss and old data valid and modified and at the same time the write buffer is empty, accomodate the old date 
+        if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified) begin //in ready state, if miss and old data valid and modified, accomodate the old date 
            write_buffer_w = cache_r[proc_modulo][~ recent_r[proc_modulo]];
-           write_buffer_tag_and_modulo_w = {tag_r[proc_modulo][~ recent_r[proc_modulo]], proc_modulo};
         end
     end
 
     always @(posedge clk) begin
         if(proc_reset) begin
             write_buffer_r <= 128'd0;
-            write_buffer_tag_and_modulo_r <= 28'd0;
         end
         else begin
             write_buffer_r <= write_buffer_w;
+        end
+    end
+
+    //Handle write_buffer_tag_and_modulo_r
+    always @(*) begin
+        write_buffer_tag_and_modulo_w = write_buffer_tag_and_modulo_r;
+        if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified) begin //in ready state, if miss and old data valid and modified, accomodate the old date 
+           write_buffer_tag_and_modulo_w = {tag_r[proc_modulo][~ recent_r[proc_modulo]], proc_modulo};
+        end
+    end
+
+    always @(posedge clk) begin
+        if(proc_reset) begin
+            write_buffer_tag_and_modulo_r <= 28'd0;
+        end
+        else begin
             write_buffer_tag_and_modulo_r <= write_buffer_tag_and_modulo_w;
         end
     end
@@ -191,7 +204,7 @@ module cache(
         if (state_r == STATE_READ && mem_ready) begin
             cache_w[proc_modulo][~ recent_r[proc_modulo]] = mem_rdata;
         end
-        else if (state_r == STATE_READY && write_hit) begin
+        else if (write_hit) begin
             cache_w[proc_modulo][index][(proc_offset+1)*32-1-:32] = proc_wdata;
         end
     end
@@ -276,7 +289,7 @@ module cache(
         for (i = 0; i < 4; i = i + 1) begin
             recent_w[i] = recent_r[i];
         end
-        if (state_r == STATE_READY && (read_hit || write_hit)) begin
+        if (read_hit || write_hit) begin
             recent_w[proc_modulo] = index;
         end
     end
@@ -330,8 +343,8 @@ module cache(
     //Output
     assign proc_stall = stall;
     assign proc_rdata = cache_r[proc_modulo][index][(proc_offset+1)*32-1-:32];
-    assign mem_read = state_r == STATE_READ & ~ mem_ready;
-    assign mem_write = state_r == STATE_WRITE & ~ mem_ready;
-    assign mem_addr = state_r == STATE_READ ? {proc_tag, proc_modulo} : write_buffer_tag_and_modulo_r;
+    assign mem_read = (state_r == STATE_READ) & ~ mem_ready;
+    assign mem_write = (state_r == STATE_WRITE) & ~ mem_ready;
+    assign mem_addr = (state_r == STATE_READ) ? {proc_tag, proc_modulo} : write_buffer_tag_and_modulo_r;
     assign mem_wdata = write_buffer_r;
 endmodule

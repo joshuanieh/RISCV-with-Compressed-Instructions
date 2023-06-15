@@ -196,7 +196,7 @@ module cache_read_only(
         for (i = 0; i < 4; i = i + 1) begin
             recent_w[i] = recent_r[i];
         end
-        if (state_r == STATE_READY && read_hit) begin
+        if (read_hit) begin
             recent_w[proc_modulo] = index;
         end
     end

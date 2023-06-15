@@ -138,7 +138,7 @@ module cache(
         if (state_r == STATE_READ && mem_ready) begin
             cache_w[proc_modulo][~ recent_r[proc_modulo]] = mem_rdata;
         end
-        else if (state_r == STATE_READY && write_hit) begin
+        else if (write_hit) begin
             cache_w[proc_modulo][index][(proc_offset+1)*32-1-:32] = proc_wdata;
         end
     end
@@ -223,7 +223,7 @@ module cache(
         for (i = 0; i < 4; i = i + 1) begin
             recent_w[i] = recent_r[i];
         end
-        if (state_r == STATE_READY && (read_hit || write_hit)) begin
+        if (read_hit || write_hit) begin
             recent_w[proc_modulo] = index;
         end
     end
