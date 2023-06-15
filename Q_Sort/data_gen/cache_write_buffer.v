@@ -97,35 +97,40 @@ module cache(
     //Handle state_r (FSM)
     always @(*) begin
         case (state_r)
-            STATE_READY: begin
+            STATE_READY:
                 if (read_miss || write_miss) begin
-                    state_w = STATE_READ;
+                    if (old_valid_and_modified) begin //need write back modified data
+                        if (write_buffer_empty_r) begin //write data to write buffer if the buffer is empty and read first
+                            state_w = STATE_READ;
+                        end
+                        else begin //write back write buffer to memory if the buffer is nonempty
+                            state_w = STATE_WRITE;
+                        end
+                    end
+                    else begin //data not modified and no need to write memory
+                        state_w = STATE_READ;
+                    end
                 end
-                else begin 
+                else if (write_buffer_empty_r == 1'b0) begin //if no sequential miss, write the buffer back
+                    state_w = STATE_WRITE;
+                end
+                else begin //no miss and no data in write buffer
                     state_w = STATE_READY;
                 end
-            end
-            STATE_WRITE: begin
+            STATE_WRITE:
                 if (mem_ready) begin //write memory finish
                     state_w = STATE_READY;
                 end
                 else begin //write memory not finish
                     state_w = STATE_WRITE;
                 end
-            end
-            STATE_READ: begin
+            STATE_READ:
                 if (mem_ready) begin //read memory finish
-                    if (write_buffer_empty_r == 1'b0) begin //write back write buffer if the buffer is nonempty
-                        state_w = STATE_WRITE;
-                    end
-                    else begin
-                        state_w = STATE_READY;
-                    end
+                    state_w = STATE_READY;
                 end
                 else begin //read memory not finish
                     state_w = STATE_READ;
                 end
-            end
             default: //dead zone
                 state_w = STATE_READY;
         endcase

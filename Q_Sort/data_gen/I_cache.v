@@ -1,4 +1,4 @@
-module cache(
+module I_cache(
     clk,
     proc_reset,
     proc_read,
@@ -49,22 +49,13 @@ module cache(
     reg   [26-1:0] tag_w[0:4-1][0:2-1]; //tag bits for blocks
  
     reg            recent_r[0:4-1]; //recent bit for blocks, 1'b0 means cache_r[proc_modulo][0] is recently taken
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////Todo, dirty bit
     reg            recent_w[0:4-1]; //recent bit for blocks
 
     wire  [26-1:0] proc_tag;
     wire   [2-1:0] proc_modulo;
     wire   [2-1:0] proc_offset;
 
-    reg  [128-1:0] write_buffer_r;
-    reg  [128-1:0] write_buffer_w;
-    reg   [28-1:0] write_buffer_tag_and_modulo_r;
-    reg   [28-1:0] write_buffer_tag_and_modulo_w;
-    reg            write_buffer_empty_r;
-    reg            write_buffer_empty_w;
-
-    wire           stall; //stall due to nonempty write buffer
-
-    wire           hit;
     wire           read_miss;
     wire           read_hit;
     wire           write_miss;
@@ -85,48 +76,42 @@ module cache(
     assign proc_offset = proc_addr[2-1:0];
 
     //Control signal
+    assign read_hit = proc_read && ((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
+    assign read_miss = proc_read && !((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
+    assign write_hit = proc_write && ((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
+    assign write_miss = proc_write && !((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
+    assign old_valid_and_modified = proc_tag != tag_r[proc_modulo][~ recent_r[proc_modulo]] && valid_r[proc_modulo][~ recent_r[proc_modulo]] && modified_r[proc_modulo][~ recent_r[proc_modulo]];
+
     assign index = proc_tag == tag_r[proc_modulo][1];
-    assign hit = (proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]);
-    assign read_hit = proc_read && hit;
-    assign read_miss = proc_read && !hit;
-    assign write_hit = proc_write && hit;
-    assign write_miss = proc_write && !hit;
-    assign old_valid_and_modified = valid_r[proc_modulo][~ recent_r[proc_modulo]] && modified_r[proc_modulo][~ recent_r[proc_modulo]];
-    assign stall = read_miss || write_miss;
 
     //Handle state_r (FSM)
     always @(*) begin
         case (state_r)
-            STATE_READY: begin
-                if (read_miss || write_miss) begin
-                    state_w = STATE_READ;
-                end
-                else begin 
-                    state_w = STATE_READY;
-                end
-            end
-            STATE_WRITE: begin
-                if (mem_ready) begin //write memory finish
-                    state_w = STATE_READY;
-                end
-                else begin //write memory not finish
+            STATE_READY:
+                if ((read_miss || write_miss) && old_valid_and_modified) begin
                     state_w = STATE_WRITE;
                 end
-            end
-            STATE_READ: begin
-                if (mem_ready) begin //read memory finish
-                    if (write_buffer_empty_r == 1'b0) begin //write back write buffer if the buffer is nonempty
-                        state_w = STATE_WRITE;
-                    end
-                    else begin
-                        state_w = STATE_READY;
-                    end
-                end
-                else begin //read memory not finish
+                else if ((read_miss || write_miss) && ~ old_valid_and_modified) begin
                     state_w = STATE_READ;
                 end
-            end
-            default: //dead zone
+                else begin
+                    state_w = STATE_READY;
+                end
+            STATE_WRITE:
+                if (mem_ready) begin
+                    state_w = STATE_READ;
+                end
+                else begin
+                    state_w = STATE_WRITE;
+                end
+            STATE_READ:
+                if (mem_ready) begin
+                    state_w = STATE_READY;
+                end
+                else begin
+                    state_w = STATE_READ;
+                end
+            default: 
                 state_w = STATE_READY;
         endcase
     end
@@ -137,47 +122,6 @@ module cache(
         end
         else begin
             state_r <= state_w;
-        end
-    end
-    
-    //Handle write_buffer_empty_r
-    always @(*) begin
-        write_buffer_empty_w = write_buffer_empty_r;
-        if (state_r == STATE_WRITE && mem_ready) begin //if write finish, set write buffer empty to true
-            write_buffer_empty_w = 1'b1;
-        end
-        else if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified && write_buffer_empty_r) begin //in ready state, if miss and old data valid and modified and at the same time the write buffer is empty, accomodate the old date 
-            write_buffer_empty_w = 1'b0;
-        end
-    end
-
-    always@(posedge clk) begin
-        if(proc_reset) begin
-            write_buffer_empty_r <= 1'b1;
-        end
-        else begin
-            write_buffer_empty_r <= write_buffer_empty_w;
-        end
-    end
-
-    //Handle write_buffer_r
-    always @(*) begin
-        write_buffer_w = write_buffer_r;
-        write_buffer_tag_and_modulo_w = write_buffer_tag_and_modulo_r;
-        if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified && write_buffer_empty_r) begin //in ready state, if miss and old data valid and modified and at the same time the write buffer is empty, accomodate the old date 
-           write_buffer_w = cache_r[proc_modulo][~ recent_r[proc_modulo]];
-           write_buffer_tag_and_modulo_w = {tag_r[proc_modulo][~ recent_r[proc_modulo]], proc_modulo};
-        end
-    end
-
-    always @(posedge clk) begin
-        if(proc_reset) begin
-            write_buffer_r <= 128'd0;
-            write_buffer_tag_and_modulo_r <= 28'd0;
-        end
-        else begin
-            write_buffer_r <= write_buffer_w;
-            write_buffer_tag_and_modulo_r <= write_buffer_tag_and_modulo_w;
         end
     end
 
@@ -276,7 +220,10 @@ module cache(
         for (i = 0; i < 4; i = i + 1) begin
             recent_w[i] = recent_r[i];
         end
-        if (state_r == STATE_READY && (read_hit || write_hit)) begin
+        if (state_r == STATE_READ && mem_ready) begin
+            recent_w[proc_modulo] = ~ recent_r[proc_modulo];
+        end
+        else if (state_r == STATE_READY && (read_hit || write_hit)) begin
             recent_w[proc_modulo] = index;
         end
     end
@@ -328,10 +275,14 @@ module cache(
     end
 
     //Output
-    assign proc_stall = stall;
+    assign proc_stall = read_miss || write_miss;
     assign proc_rdata = cache_r[proc_modulo][index][(proc_offset+1)*32-1-:32];
-    assign mem_read = state_r == STATE_READ & ~ mem_ready;
-    assign mem_write = state_r == STATE_WRITE & ~ mem_ready;
-    assign mem_addr = state_r == STATE_READ ? {proc_tag, proc_modulo} : write_buffer_tag_and_modulo_r;
-    assign mem_wdata = write_buffer_r;
+    assign mem_read = state_r == STATE_READ;
+    assign mem_write = state_r == STATE_WRITE;
+    assign mem_addr = state_r == STATE_READ ? {proc_tag, proc_modulo} : {tag_r[proc_modulo][~ recent_r[proc_modulo]], proc_modulo};
+    assign mem_wdata = cache_r[proc_modulo][~ recent_r[proc_modulo]];
+
+    // always @(*) begin
+    //     $monitor("proc addr: %h, read hit: %b, read miss: %b, write hit: %b, write miss: %b, mem ready: %b, mem read: %b, mem write: %b, mem addr: %h, mem wdata: %h, mem rdata: %h", proc_addr, read_hit, read_miss, write_hit, write_miss, mem_ready, mem_read, mem_write, mem_addr, mem_wdata, mem_rdata);
+    // end
 endmodule

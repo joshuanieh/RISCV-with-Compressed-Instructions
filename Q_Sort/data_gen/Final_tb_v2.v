@@ -113,22 +113,24 @@ module Final_scoring;
 	initial begin
 		$readmemh (`DMEM_INIT, slow_memD.mem ); // initialize data in DMEM
 		$readmemh (`IMEM_INIT, slow_memI.mem ); // initialize data in IMEM
-
+	    $dumpfile("Final.vcd");
+	    $dumpvars;
 	    // $fsdbDumpfile("Final.fsdb");			
 		// $fsdbDumpvars(0,Final_scoring,"+mda");
 		// $fsdbDumpvars;
 	
 		clk = 0;
 		rst_n = 1'b1;
-		#(`CYCLE*0.2) rst_n = 1'b0;
-		#(`CYCLE*8.5) rst_n = 1'b1;
+		#(`CYCLE*0.6) rst_n = 1'b0;
+		#(`CYCLE*8.9) 
+		#0.1 rst_n = 1'b1;
 
 		$display("-----------------------------------------------------\n");
 	 	$display("START!!! Simulation Start .....\n");
 	 	$display("-----------------------------------------------------\n");
 
      
-		#(`CYCLE*10000000) // calculate clock cycles for all operation (you can modify it)
+		#(`CYCLE*1000) // calculate clock cycles for all operation (you can modify it)
 		$display("============================================================================");
 		$display("\n           Error!!! There is something wrong with your code ...!          ");
 		$display("\n                       The test result is .....FAIL                     \n");

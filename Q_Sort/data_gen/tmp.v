@@ -97,35 +97,40 @@ module cache(
     //Handle state_r (FSM)
     always @(*) begin
         case (state_r)
-            STATE_READY: begin
+            STATE_READY:
                 if (read_miss || write_miss) begin
-                    state_w = STATE_READ;
+                    if (old_valid_and_modified) begin //need write back modified data
+                        if (write_buffer_empty_r) begin //write data to write buffer if the buffer is empty and read first
+                            state_w = STATE_READ;
+                        end
+                        else begin //write back write buffer to memory if the buffer is nonempty
+                            state_w = STATE_WRITE;
+                        end
+                    end
+                    else begin //data not modified and no need to write memory
+                        state_w = STATE_READ;
+                    end
                 end
-                else begin 
+                else if (write_buffer_empty_r == 1'b0) begin //if no sequential miss, write the buffer back
+                    state_w = STATE_WRITE;
+                end
+                else begin //no miss and no data in write buffer
                     state_w = STATE_READY;
                 end
-            end
-            STATE_WRITE: begin
+            STATE_WRITE:
                 if (mem_ready) begin //write memory finish
                     state_w = STATE_READY;
                 end
                 else begin //write memory not finish
                     state_w = STATE_WRITE;
                 end
-            end
-            STATE_READ: begin
+            STATE_READ:
                 if (mem_ready) begin //read memory finish
-                    if (write_buffer_empty_r == 1'b0) begin //write back write buffer if the buffer is nonempty
-                        state_w = STATE_WRITE;
-                    end
-                    else begin
-                        state_w = STATE_READY;
-                    end
+                    state_w = STATE_READY;
                 end
                 else begin //read memory not finish
                     state_w = STATE_READ;
                 end
-            end
             default: //dead zone
                 state_w = STATE_READY;
         endcase
@@ -143,7 +148,7 @@ module cache(
     //Handle write_buffer_empty_r
     always @(*) begin
         write_buffer_empty_w = write_buffer_empty_r;
-        if (state_r == STATE_WRITE && mem_ready) begin //if write finish, set write buffer empty to true
+        if (state_r == STATE_WRITE && mem_ready) begin //if write finish, set write buffer empty yo true
             write_buffer_empty_w = 1'b1;
         end
         else if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified && write_buffer_empty_r) begin //in ready state, if miss and old data valid and modified and at the same time the write buffer is empty, accomodate the old date 
@@ -171,14 +176,8 @@ module cache(
     end
 
     always @(posedge clk) begin
-        if(proc_reset) begin
-            write_buffer_r <= 128'd0;
-            write_buffer_tag_and_modulo_r <= 28'd0;
-        end
-        else begin
-            write_buffer_r <= write_buffer_w;
-            write_buffer_tag_and_modulo_r <= write_buffer_tag_and_modulo_w;
-        end
+        write_buffer_r <= write_buffer_w;
+        write_buffer_tag_and_modulo_r <= write_buffer_tag_and_modulo_w;
     end
 
     //Handle cache_r
@@ -197,18 +196,9 @@ module cache(
     end
 
     always@(posedge clk) begin
-        if(proc_reset) begin
-            for (i = 0; i < 4; i = i + 1) begin
-                for (j = 0; j < 2; j = j + 1) begin
-                    cache_r[i][j] <= 128'd0;
-                end
-            end
-        end
-        else begin
-            for (i = 0; i < 4; i = i + 1) begin
-                for (j = 0; j < 2; j = j + 1) begin
-                    cache_r[i][j] <= cache_w[i][j];
-                end
+        for (i = 0; i < 4; i = i + 1) begin
+            for (j = 0; j < 2; j = j + 1) begin
+                cache_r[i][j] <= cache_w[i][j];
             end
         end
     end
@@ -255,18 +245,9 @@ module cache(
     end
 
     always@(posedge clk) begin
-        if(proc_reset) begin
-            for (i = 0; i < 4; i = i + 1) begin
-                for (j = 0; j < 2; j = j + 1) begin
-                    tag_r[i][j] <= 26'd0;
-                end
-            end
-        end
-        else begin
-            for (i = 0; i < 4; i = i + 1) begin
-                for (j = 0; j < 2; j = j + 1) begin
-                    tag_r[i][j] <= tag_w[i][j];
-                end
+        for (i = 0; i < 4; i = i + 1) begin
+            for (j = 0; j < 2; j = j + 1) begin
+                tag_r[i][j] <= tag_w[i][j];
             end
         end
     end
