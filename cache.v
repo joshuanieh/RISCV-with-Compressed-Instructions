@@ -89,11 +89,13 @@ module cache(
     always @(*) begin
         case (state_r)
             STATE_READY:
-                if ((read_miss || write_miss) && old_valid_and_modified) begin
-                    state_w = STATE_WRITE;
-                end
-                else if ((read_miss || write_miss) && ~ old_valid_and_modified) begin
-                    state_w = STATE_READ;
+                if (read_miss || write_miss) begin
+                    if (old_valid_and_modified) begin
+                        state_w = STATE_WRITE;
+                    end
+                    else begin
+                        state_w = STATE_READ;
+                    end
                 end
                 else begin
                     state_w = STATE_READY;

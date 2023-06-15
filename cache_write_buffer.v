@@ -55,6 +55,14 @@ module cache(
     wire   [2-1:0] proc_modulo;
     wire   [2-1:0] proc_offset;
 
+    reg  [128-1:0] write_buffer_r;
+    reg  [128-1:0] write_buffer_w;
+    reg            write_buffer_empty_r;
+    reg            write_buffer_empty_w;
+
+    wire           stall; //stall due to nonempty write buffer
+
+    wire           hit;
     wire           read_miss;
     wire           read_hit;
     wire           write_miss;
@@ -75,42 +83,53 @@ module cache(
     assign proc_offset = proc_addr[2-1:0];
 
     //Control signal
-    assign read_hit = proc_read && ((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
-    assign read_miss = proc_read && !((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
-    assign write_hit = proc_write && ((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
-    assign write_miss = proc_write && !((proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]));
-    assign old_valid_and_modified = valid_r[proc_modulo][~ recent_r[proc_modulo]] && modified_r[proc_modulo][~ recent_r[proc_modulo]];
-
     assign index = proc_tag == tag_r[proc_modulo][1];
+    assign hit = (proc_tag == tag_r[proc_modulo][0] && valid_r[proc_modulo][0]) || (proc_tag == tag_r[proc_modulo][1] && valid_r[proc_modulo][1]);
+    assign read_hit = proc_read && hit;
+    assign read_miss = proc_read && !hit;
+    assign write_hit = proc_write && hit;
+    assign write_miss = proc_write && !hit;
+    assign old_valid_and_modified = valid_r[proc_modulo][~ recent_r[proc_modulo]] && modified_r[proc_modulo][~ recent_r[proc_modulo]];
+    assign stall = read_miss || write_miss;
 
     //Handle state_r (FSM)
     always @(*) begin
         case (state_r)
             STATE_READY:
-                if ((read_miss || write_miss) && old_valid_and_modified) begin
+                if (read_miss || write_miss) begin
+                    if (old_valid_and_modified) begin //need write back modified data
+                        if (write_buffer_empty_r) begin //write data to write buffer if the buffer is empty and read first
+                            state_w = STATE_READ;
+                        end
+                        else begin //write back write buffer to memory if the buffer is nonempty
+                            state_w = STATE_WRITE;
+                        end
+                    end
+                    else begin //data not modified and no need to write memory
+                        state_w = STATE_READ;
+                    end
+                end
+                else if (write_buffer_empty_r == 1'b0) begin //if no sequential miss, write the buffer back
                     state_w = STATE_WRITE;
                 end
-                else if ((read_miss || write_miss) && ~ old_valid_and_modified) begin
-                    state_w = STATE_READ;
-                end
-                else begin
+                else begin //no miss and no data in write buffer
                     state_w = STATE_READY;
                 end
             STATE_WRITE:
-                if (mem_ready) begin
-                    state_w = STATE_READ;
+                if (mem_ready) begin //write memory finish
+                    state_w = STATE_READY;
                 end
-                else begin
+                else begin //write memory not finish
                     state_w = STATE_WRITE;
                 end
             STATE_READ:
-                if (mem_ready) begin
+                if (mem_ready) begin //read memory finish
                     state_w = STATE_READY;
                 end
-                else begin
+                else begin //read memory not finish
                     state_w = STATE_READ;
                 end
-            default: 
+            default: //dead zone
                 state_w = STATE_READY;
         endcase
     end
@@ -122,6 +141,38 @@ module cache(
         else begin
             state_r <= state_w;
         end
+    end
+    
+    //Handle write_buffer_empty_r
+    always @(*) begin
+        write_buffer_empty_w = write_buffer_empty_r;
+        if (state_r == STATE_WRITE && mem_ready) begin //if write finish, set write buffer empty yo true
+            write_buffer_empty_w = 1'b1;
+        end
+        else if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified && write_buffer_empty_r) begin //in ready state, if miss and old data valid and modified and at the same time the write buffer is empty, accomodate the old date 
+            write_buffer_empty_w = 1'b0;
+        end
+    end
+
+    always@(posedge clk) begin
+        if(proc_reset) begin
+            write_buffer_empty_r <= 1'b1;
+        end
+        else begin
+            write_buffer_empty_r <= write_buffer_empty_w;
+        end
+    end
+
+    //Handle write_buffer_r
+    always @(*) begin
+        write_buffer_w = write_buffer_r;
+        if (state_r == STATE_READY && (read_miss || write_miss) && old_valid_and_modified && write_buffer_empty_r) begin //in ready state, if miss and old data valid and modified and at the same time the write buffer is empty, accomodate the old date 
+           write_buffer_w = cache_r[proc_modulo][~ recent_r[proc_modulo]];
+        end
+    end
+
+    always @(posedge clk) begin
+        write_buffer_r <= write_buffer_w;
     end
 
     //Handle cache_r
@@ -276,5 +327,5 @@ module cache(
     assign mem_read = state_r == STATE_READ & ~ mem_ready;
     assign mem_write = state_r == STATE_WRITE & ~ mem_ready;
     assign mem_addr = state_r == STATE_READ ? {proc_tag, proc_modulo} : {tag_r[proc_modulo][~ recent_r[proc_modulo]], proc_modulo};
-    assign mem_wdata = cache_r[proc_modulo][~ recent_r[proc_modulo]];
+    assign mem_wdata = write_buffer_r;
 endmodule
