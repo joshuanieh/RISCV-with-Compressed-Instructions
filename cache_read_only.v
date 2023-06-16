@@ -111,7 +111,7 @@ module cache_read_only(
                 cache_w[i][j] = cache_r[i][j];
             end
         end
-        if (state_r == STATE_READ && mem_ready) begin
+        if (mem_ready) begin
             cache_w[proc_modulo][~ recent_r[proc_modulo]] = mem_rdata;
         end
     end
@@ -140,7 +140,7 @@ module cache_read_only(
                 valid_w[i][j] = valid_r[i][j];
             end
         end
-        if (state_r == STATE_READ && mem_ready) begin
+        if (mem_ready) begin
             valid_w[proc_modulo][~ recent_r[proc_modulo]] = 1'b1;
         end
     end
@@ -169,7 +169,7 @@ module cache_read_only(
                 tag_w[i][j] = tag_r[i][j];
             end
         end
-        if (state_r == STATE_READ && mem_ready) begin
+        if (mem_ready) begin
             tag_w[proc_modulo][~ recent_r[proc_modulo]] = proc_tag;
         end
     end
