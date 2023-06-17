@@ -1,7 +1,7 @@
 // Top module of your design, you cannot modify this module!!
 
 `include "RISCV_Pipeline.v"
-`include "cache.v"
+`include "cache_2.v"
 `include "cache_read_only.v"
 
 module CHIP (	clk,
